@@ -9,6 +9,12 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+env:
+  DEPLOY_HOST: 147.79.70.111
+  DEPLOY_USER: deploy
+  DEPLOY_PATH: /var/www/alphadevs-dusk.blisslerstechnolabs.com
+  SITE_URL: https://alphadevs-dusk.blisslerstechnolabs.com
+
 jobs:
   deploy:
     name: Pull latest on server
@@ -18,6 +24,16 @@ jobs:
       url: https://alphadevs-dusk.blisslerstechnolabs.com
 
     steps:
+      - name: Check required secret
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::Repository secret DEPLOY_SSH_KEY is not set. Add the deploy private key under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "DEPLOY_SSH_KEY is present."
+
       - name: Set up SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -25,26 +41,24 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          # Pinned server host key (output of: ssh-keyscan -t ed25519 <server>)
+          # Pinned server host key (output of: ssh-keyscan -t ed25519 147.79.70.111)
           echo "147.79.70.111 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICr2tus1cyIw7W/kZaB4+bIZd95N9+8Vl0FNfJnZoI54" >> ~/.ssh/known_hosts
 
       - name: Pull and reset on server
-        env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" bash -s <<'EOF'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s <<EOF
             set -euo pipefail
-            cd /var/www/alphadevs-dusk.blisslerstechnolabs.com
+            cd "${DEPLOY_PATH}"
             git fetch --depth=1 origin main
             git reset --hard origin/main
             git clean -fd
-            echo "Deployed $(git rev-parse --short HEAD): $(git log -1 --pretty=%s)"
+            echo "Deployed \$(git rev-parse --short HEAD): \$(git log -1 --pretty=%s)"
           EOF
 
       - name: Smoke test
         run: |
           sleep 2
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://alphadevs-dusk.blisslerstechnolabs.com/)
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${SITE_URL}/")
           echo "HTTP $code"
           test "$code" = "200"
