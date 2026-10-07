@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Support & Feedback">
+<title>Feedback · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content"><div id="view"></div></main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, fdate, state } = BL;
+    BL.ios.shell({ title: "Feedback", back: "support.html", backLabel: "Support", tab: "profile" });
+    const view = document.getElementById("view");
+    const rated = () => new Set(state.feedback.filter((f) => f.userId === BL.me()).map((f) => f.bookingId));
+    const eligible = () => BL.myBookings().filter((b) => !["cancelled", "refunded"].includes(b.status) && (b.status === "completed" || BL.daysUntil(BL.firstDate(b)) < 0) && !rated().has(b.id)).sort((a, b) => BL.firstDate(b).localeCompare(BL.firstDate(a)));
+    let bookingId = BL.qs("booking") || "", rating = 0;
+    const WORDS = ["", "Not good", "Could be better", "Fine", "Really good", "Perfect evening"];
+    function draw() {
+      const list = eligible(); if (!list.some((b) => b.id === bookingId)) bookingId = list[0] ? list[0].id : "";
+      const mine = state.feedback.filter((f) => f.userId === BL.me()).sort((a, b) => b.at.localeCompare(a.at));
+      view.innerHTML = `
+        <h1 class="large-title">Feedback<small>Every rating earns 50 points</small></h1>
+        ${list.length ? `
+        <form id="form" novalidate class="mb-8">
+          <div class="field mb-4"><label class="label" for="booking">Booking</label><select class="select" id="booking">${list.map((b) => `<option value="${b.id}" ${b.id === bookingId ? "selected" : ""}>${esc(b.title)} · ${BL.bookingWhen(b)}</option>`).join("")}</select></div>
+          <p class="label mb-2" id="ratingLabel">How was it?</p>
+          <div class="stars mb-1" role="radiogroup" aria-labelledby="ratingLabel">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="${n <= rating ? "is-on" : ""}" data-star="${n}" role="radio" aria-checked="${n === rating}" aria-label="${n} of 5">${icon("star")}</button>`).join("")}</div>
+          <p class="help mb-4" id="word" style="min-height:18px">${WORDS[rating]}</p>
+          <div class="field mb-5"><label class="label" for="text">What stood out?</label><textarea class="textarea" id="text" rows="4" placeholder="The food, the timing between stops, the welcome at the door…"></textarea></div>
+          <button type="submit" class="btn btn-primary btn-lg btn-block" ${rating ? "" : "disabled"}>Send feedback</button>
+        </form>` : `<div class="empty mb-8"><span class="tile">${icon("star")}</span><h3>Nothing to rate</h3><p>Finished bookings you haven’t rated show here.</p><a class="btn btn-secondary btn-sm" href="bookings.html?tab=past">Past bookings</a></div>`}
+        <section class="section">
+          <div class="section-title"><h2>Your ratings</h2></div>
+          ${mine.length ? `<div class="flex flex-col gap-3 stagger">${mine.map((f, i) => { const b = BL.booking(f.bookingId); return `<a class="card block pressable" href="${b ? `booking.html?id=${b.id}` : "bookings.html"}" style="--i:${Math.min(i, 14)}"><div class="flex items-center justify-between gap-2 mb-1"><strong class="truncate">${b ? esc(b.title) : "Booking"}</strong><span class="muted text-caption" style="flex:none">${fdate(f.at)}</span></div><div class="flex gap-0.5 mb-2" aria-label="${f.rating} of 5">${[1, 2, 3, 4, 5].map((n) => `<span style="color:${n <= f.rating ? "var(--bone)" : "var(--slate)"}">${icon("star", "sm")}</span>`).join("")}</div><p class="text-sm muted">${esc(f.text)}</p></a>`; }).join("")}</div>` : `<div class="empty"><h3>No ratings yet</h3><p>Your ratings show here and on each place.</p></div>`}
+        </section>`;
+    }
+    draw();
+    BL.on(view, "click", "[data-star]", (e, b) => { rating = Number(b.dataset.star); view.querySelectorAll("[data-star]").forEach((s) => { const n = Number(s.dataset.star); s.classList.toggle("is-on", n <= rating); s.setAttribute("aria-checked", String(n === rating)); }); view.querySelector("#word").textContent = WORDS[rating]; view.querySelector("#form button[type=submit]").disabled = false; });
+    BL.on(view, "change", "#booking", (e, s) => { bookingId = s.value; });
+    BL.on(view, "submit", "#form", (e) => {
+      e.preventDefault(); if (!rating) return;
+      const txt = view.querySelector("#text").value.trim() || WORDS[rating];
+      BL.submitFeedback(bookingId, rating, txt); BL.toast("Thanks. 50 points added"); rating = 0; draw(); document.getElementById("content").scrollTop = 0;
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Reports · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    BL.web.shell({ title: "Reports", role: "admin", active: "reports" });
+    const view = document.getElementById("view");
+    const rep = BL.reportTotals();
+    const live = state.bookings.filter((b) => !["cancelled", "refunded"].includes(b.status));
+    const cats = Object.entries(rep.byCat).sort((a, b) => b[1] - a[1]); const catMax = Math.max(1, ...cats.map((c) => c[1]));
+    const vendors = Object.entries(rep.byVendor).map(([id, amt]) => ({ v: BL.vendor(id), amt })).filter((x) => x.v).sort((a, b) => b.amt - a.amt);
+    const top = vendors.slice(0, 6); const topMax = Math.max(1, ...top.map((x) => x.amt));
+    const tickets = state.tickets.filter((t) => t.status === "paid" || t.status === "checked_in").reduce((s, t) => s + t.qty * BL.event(t.eventId).price, 0);
+    const avg = live.length ? rep.gmv / live.length : 0;
+    const members = state.users.filter((u) => u.role === "member" && u.status === "active").length;
+    const bars = (items, max, label, val) => `<div class="bar-chart">${items.map((x, i) => `<div class="bar" style="--i:${i}" title="${esc(label(x))} · ${money(val(x))}"><i style="height:${Math.max(4, Math.round((val(x) / max) * 100))}%"></i><b>${esc(label(x))}</b></div>`).join("")}</div>`;
+    view.innerHTML = `
+      <div class="page-head"><div><h1>Reports</h1><p>Everything booked through Blissers to ${fdate(BL.day(0), "long")}</p></div><button class="btn btn-secondary" id="dl">${icon("download", "sm")}Download CSV</button></div>
+      <div class="grid-stats mb-8">
+        <div class="stat panel p-4"><span class="value" id="gmv">${money(0)}</span><span class="label muted">Booked value</span></div>
+        <div class="stat panel p-4"><span class="value" id="com">${money(0)}</span><span class="label muted">Commission earned</span></div>
+        <div class="stat panel p-4"><span class="value">${money(rep.refunds)}</span><span class="label muted">Refunded</span></div>
+        <div class="stat panel p-4"><span class="value">${money(avg)}</span><span class="label muted">Average booking</span></div>
+      </div>
+      <div class="split">
+        <div>
+          <section class="section"><div class="section-title"><h2>By category</h2></div><div class="card">${cats.length ? bars(cats, catMax, (c) => c[0].replace(" & Outdoors", ""), (c) => c[1]) : `<div class="empty"><span class="tile">${icon("chart")}</span><h3>Nothing booked yet</h3><p>Categories fill in as plans are paid for.</p></div>`}</div></section>
+          <section class="section"><div class="section-title"><h2>Top vendors</h2><a href="admin-vendors.html">All vendors</a></div><div class="card">${top.length ? bars(top, topMax, (x) => x.v.name.split(" ")[0], (x) => x.amt) : `<div class="empty"><span class="tile">${icon("store")}</span><h3>No vendor revenue yet</h3><p>Vendors rank here once they are booked.</p></div>`}</div></section>
+          <section class="section"><div class="section-title"><h2>Vendor payouts</h2></div><div id="vt"></div></section>
+        </div>
+        <div>
+          <section class="section"><div class="section-title"><h2>At a glance</h2></div><div class="card"><div class="kv"><dt>Live bookings</dt><dd class="num">${live.length}</dd></div><div class="kv"><dt>Planned by the concierge</dt><dd class="num">${live.length ? Math.round((live.filter((b) => b.source === "concierge").length / live.length) * 100) : 0}%</dd></div><div class="kv"><dt>Multi-vendor plans</dt><dd class="num">${live.filter((b) => new Set(b.items.map((i) => i.vendorId)).size > 1).length}</dd></div><div class="kv"><dt>Ticket sales</dt><dd class="num">${money(tickets)}</dd></div><div class="kv"><dt>Active members</dt><dd class="num">${members}</dd></div><div class="kv"><dt>Live vendors</dt><dd class="num">${state.vendors.filter((v) => v.status === "active").length}</dd></div><div class="kv"><dt>Refund rate</dt><dd class="num">${rep.gmv ? Math.round((rep.refunds / rep.gmv) * 100) : 0}%</dd></div></div></section>
+          <section class="section"><div class="section-title"><h2>Activity</h2></div>${state.log.length ? `<div class="panel px-4">${state.log.slice(0, 12).map((l) => `<div class="row"><span class="tile">${icon("bolt", "sm")}</span><span class="body"><span class="title block truncate">${esc(l.text)}</span><span class="sub">${fstamp(l.at)}</span></span></div>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("bolt")}</span><h3>Nothing logged yet</h3><p>Approvals, refunds and edits appear here.</p></div>`}</section>
+        </div>
+      </div>`;
+    BL.countUp(document.getElementById("gmv"), rep.gmv, money); BL.countUp(document.getElementById("com"), rep.commission, money);
+    BL.webTable(document.getElementById("vt"), { rows: vendors, sort: "amt", dir: "desc", href: (x) => `admin-vendor.html?id=${x.v.id}`, pageSize: 8,
+      cols: [{ key: "name", label: "Vendor", sort: (x) => x.v.name, render: (x) => `<span class="truncate">${esc(x.v.name)}</span>` }, { key: "amt", label: "Booked", num: true, render: (x) => money(x.amt) }, { key: "rate", label: "Rate", num: true, sort: (x) => x.v.commission, render: (x) => `${x.v.commission}%` }, { key: "fee", label: "Commission", num: true, sort: (x) => x.amt * x.v.commission / 100, render: (x) => money(x.amt * x.v.commission / 100) }, { key: "payout", label: "Owed to vendor", num: true, sort: (x) => x.amt * (100 - x.v.commission) / 100, render: (x) => money(x.amt * (100 - x.v.commission) / 100) }],
+      card: (x) => ({ title: esc(x.v.name), meta: `${money(x.amt)} booked · ${x.v.commission}% commission`, right: `<span class="num text-sm">${money(x.amt * (100 - x.v.commission) / 100)}</span>` }),
+      empty: `<div class="empty panel"><span class="tile">${icon("store")}</span><h3>No payouts due</h3><p>Nothing has been booked with any vendor.</p></div>` });
+    document.getElementById("dl").addEventListener("click", () => {
+      const lines = [["Vendor", "Booked", "Commission %", "Commission", "Owed"], ...vendors.map((x) => [x.v.name, x.amt, x.v.commission, Math.round(x.amt * x.v.commission / 100), Math.round(x.amt * (100 - x.v.commission) / 100)])];
+      const blob = new Blob([lines.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `blissers-payouts-${BL.day(0)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); BL.toast("CSV downloaded");
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Onboarding & Profile">
+<title>Sign in · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <div class="flex justify-end mb-4">
+    <div class="seg auto" role="group" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="false" translate="no" lang="en">English</button>
+      <button type="button" data-lang="he" aria-pressed="false" translate="no" lang="he">עברית</button>
+    </div>
+  </div>
+  <section id="stepPhone" class="stagger">
+    <div class="hero p-5 mb-6 flex items-center gap-3">
+      <svg class="ic lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.6 5 3.9 8.4 9 9-5.1.6-8.4 4-9 9-.6-5-3.9-8.4-9-9 5.1-.6 8.4-4 9-9z"/></svg>
+      <p class="text-[15px] text-white/90">One concierge for every evening out, every ticket, every weekend away.</p>
+    </div>
+    <h1 class="large-title">Your number<small>We’ll text a six-digit code to sign you in.</small></h1>
+    <form id="phoneForm" class="flex flex-col gap-4" novalidate>
+      <div class="field" id="phoneField">
+        <label class="label" for="phone">Mobile number</label>
+        <div class="flex gap-2">
+          <select class="select" id="cc" name="cc" aria-label="Country code" style="width:112px;flex:none">
+            <option value="+972" selected>+972</option><option value="+1">+1</option><option value="+44">+44</option><option value="+49">+49</option>
+          </select>
+          <input class="input" id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="54 123 4567">
+        </div>
+        <p class="error">Enter the number we should text.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg btn-block"><span class="spinner" aria-hidden="true"></span><span class="label">Text me a code</span></button>
+      <p class="muted text-caption text-center">Continuing accepts the terms and the privacy policy.</p>
+    </form>
+  </section>
+
+  <section id="stepOtp" hidden>
+    <h1 class="large-title">Enter the code<small id="sentTo">Sent to +972 54 123 4567</small></h1>
+    <form id="otpForm" class="flex flex-col gap-4" novalidate>
+      <div class="field" id="otpField">
+        <div class="otp" id="otp" role="group" aria-label="Six-digit code">
+          <input class="input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1" aria-label="Digit 1">
+          <input class="input" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+          <input class="input" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+          <input class="input" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+          <input class="input" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 5">
+          <input class="input" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 6">
+        </div>
+        <p class="help">Any six digits open the demo.</p>
+        <p class="error">Fill in all six digits.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg btn-block"><span class="spinner" aria-hidden="true"></span><span class="label">Verify</span></button>
+      <div class="flex justify-between">
+        <button type="button" class="btn btn-ghost btn-sm" id="changeNumber">Change number</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="resend">Resend code</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    BL.ios.shell({ title: "Sign in" });
+    const phoneStep = document.getElementById("stepPhone"), otpStep = document.getElementById("stepOtp");
+    const phoneForm = document.getElementById("phoneForm"), otpForm = document.getElementById("otpForm");
+    const phoneField = document.getElementById("phoneField"), otpField = document.getElementById("otpField");
+    const boxes = Array.from(document.querySelectorAll("#otp input"));
+    const seeded = BL.state.profile.phone || "";
+    phoneForm.phone.value = seeded.replace(/^\+972\s?/, "");
+    let full = seeded;
+
+    phoneForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const n = phoneForm.phone.value.trim();
+      if (!n) { phoneField.classList.add("is-invalid"); phoneForm.phone.focus(); return; }
+      phoneField.classList.remove("is-invalid");
+      full = `${phoneForm.cc.value} ${n}`;
+      const btn = phoneForm.querySelector("[type=submit]"); btn.classList.add("is-loading"); btn.disabled = true;
+      setTimeout(() => {
+        btn.classList.remove("is-loading"); btn.disabled = false;
+        document.getElementById("sentTo").textContent = `Sent to ${full}`;
+        phoneStep.hidden = true; otpStep.hidden = false; otpStep.classList.add("screen-push");
+        boxes[0].focus();
+      }, 500);
+    });
+    phoneForm.phone.addEventListener("input", () => phoneField.classList.remove("is-invalid"));
+
+    boxes.forEach((b, i) => {
+      b.addEventListener("input", () => {
+        b.value = b.value.replace(/\D/g, "").slice(-1);
+        otpField.classList.remove("is-invalid");
+        if (b.value && i < 5) boxes[i + 1].focus();
+        if (boxes.every((x) => x.value)) otpForm.requestSubmit();
+      });
+      b.addEventListener("keydown", (e) => { if (e.key === "Backspace" && !b.value && i > 0) { boxes[i - 1].value = ""; boxes[i - 1].focus(); } });
+      b.addEventListener("paste", (e) => {
+        const digits = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
+        if (!digits) return; e.preventDefault();
+        digits.split("").forEach((d, j) => { if (boxes[j]) boxes[j].value = d; });
+        boxes[Math.min(5, digits.length - 1)].focus();
+        if (digits.length === 6) otpForm.requestSubmit();
+      });
+    });
+
+    otpForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!boxes.every((x) => x.value)) { otpField.classList.add("is-invalid"); (boxes.find((x) => !x.value) || boxes[0]).focus(); return; }
+      const btn = otpForm.querySelector("[type=submit]"); btn.classList.add("is-loading"); btn.disabled = true;
+      BL.saveProfile({ phone: full, verified: true });
+      setTimeout(() => { location.href = BL.state.profile.onboarded ? "home.html" : "setup.html?step=1"; }, 500);
+    });
+    document.getElementById("changeNumber").addEventListener("click", () => {
+      otpStep.hidden = true; phoneStep.hidden = false; boxes.forEach((x) => { x.value = ""; }); phoneForm.phone.focus();
+    });
+    document.getElementById("resend").addEventListener("click", () => { boxes.forEach((x) => { x.value = ""; }); boxes[0].focus(); BL.toast("Code sent again"); });
+  })();
+</script>
+</body>
+</html>

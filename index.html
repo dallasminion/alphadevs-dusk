@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<title>Sign in · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  .door { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px; border-radius: 16px;
+    border: 1px solid var(--hair); background: var(--graphite); transition: background-color 160ms ease, border-color 160ms ease, transform 160ms var(--ease-out); }
+  .door:hover { background: #1b1b1b; border-color: var(--hair-strong); }
+  .door:active { transform: scale(0.985); }
+  .door.is-on { border-color: var(--smoke); }
+  .roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+</style>
+</head>
+<body class="min-h-screen">
+<main class="screen min-h-screen grid lg:grid-cols-2">
+  <section class="hero m-4 p-8 lg:p-14 flex flex-col justify-between min-h-[260px] lg:min-h-0">
+    <div class="flex items-center gap-2 font-medium text-[17px]">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.6 5 3.9 8.4 9 9-5.1.6-8.4 4-9 9-.6-5-3.9-8.4-9-9 5.1-.6 8.4-4 9-9z"/></svg>
+      Blissers
+      <div class="seg auto ml-auto" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="false" translate="no" lang="en">English</button>
+        <button type="button" data-lang="he" aria-pressed="false" translate="no" lang="he">עברית</button>
+      </div>
+    </div>
+    <div class="max-w-md">
+      <h1 class="text-[34px] lg:text-[44px] leading-[1.05] tracking-[-0.02em] text-white">Say what you want to do. We plan it, book it and pay for it.</h1>
+      <p class="mt-4 text-white/80 text-[15px]">One concierge, every vendor in the city, one swipe to confirm.</p>
+    </div>
+  </section>
+
+  <section class="flex items-center justify-center p-4 lg:p-14">
+    <form class="w-full max-w-[420px] flex flex-col gap-6" id="signin" novalidate>
+      <div>
+        <h2 class="text-[24px]">Sign in</h2>
+        <p class="muted text-sm mt-1">Any email and any password open the demo.</p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="email">Email</label>
+        <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="maya@example.com" spellcheck="false">
+      </div>
+      <div class="field">
+        <label class="label" for="password">Password</label>
+        <input class="input" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+
+      <div class="flex flex-col gap-3 stagger" id="doors">
+        <button type="button" class="door is-on" data-door="ios" aria-pressed="true">
+          <span class="tile"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg></span>
+          <span class="flex-1 min-w-0">
+            <span class="block font-medium">Mobile app</span>
+            <span class="block text-sm muted">The member's iPhone: concierge, plans, tickets</span>
+          </span>
+          <svg class="ic chev text-slate" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="door" data-door="web" aria-pressed="false">
+          <span class="tile"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+          <span class="flex-1 min-w-0">
+            <span class="block font-medium">Web app</span>
+            <span class="block text-sm muted">Vendor Portal and Back Office</span>
+          </span>
+          <svg class="ic chev text-slate" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <div class="roles" id="roles" hidden>
+          <button type="button" class="chip justify-center is-on" data-role="vendor" aria-pressed="true">Vendor</button>
+          <button type="button" class="chip justify-center" data-role="admin" aria-pressed="false">Admin</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span class="label">Continue</span></button>
+      <p class="muted text-xs text-center">Demo data is stored in this browser. Reset it from the sidebar or the Profile screen.</p>
+    </form>
+  </section>
+</main>
+
+<script src="assets/i18n.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  (function () {
+    const form = document.getElementById("signin");
+    const doors = document.getElementById("doors");
+    const roles = document.getElementById("roles");
+    // The web app is the Vendor Portal and the Back Office; a member only ever signs in on the phone.
+    let door = "ios", role = "vendor";
+    doors.addEventListener("click", (e) => {
+      const d = e.target.closest("[data-door]");
+      if (d) {
+        door = d.dataset.door;
+        doors.querySelectorAll("[data-door]").forEach((x) => { const on = x === d; x.classList.toggle("is-on", on); x.setAttribute("aria-pressed", String(on)); });
+        roles.hidden = door !== "web";
+        if (!roles.hidden) roles.classList.add("enter");
+      }
+      const r = e.target.closest("[data-role]");
+      if (r) {
+        role = r.dataset.role;
+        roles.querySelectorAll("[data-role]").forEach((x) => { const on = x === r; x.classList.toggle("is-on", on); x.setAttribute("aria-pressed", String(on)); });
+      }
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      btn.classList.add("is-loading"); btn.disabled = true;
+      const email = form.email.value.trim();
+      if (email) { BL.state.profile.email = email; }
+      let target;
+      if (door === "ios") {
+        BL.state.role = "user";
+        target = BL.state.profile.onboarded ? "ios/home.html" : "ios/onboarding.html";
+      } else {
+        BL.state.role = role;
+        target = "web/" + BL.web.home[role];
+      }
+      BL.save();
+      setTimeout(() => { location.href = target; }, 450);
+    });
+  })();
+</script>
+</body>
+</html>

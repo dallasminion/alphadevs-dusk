@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Users · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Users</h1><p id="sub"></p></div><button class="btn btn-primary" id="invite">Invite someone</button></div>
+  <div class="toolbar">
+    <select class="select" id="role" aria-label="Role"><option value="">Every role</option><option value="member">Members</option><option value="vendor">Vendor accounts</option><option value="admin">Admins</option></select>
+    <select class="select" id="status" aria-label="Status"><option value="">Every status</option><option value="active">Active</option><option value="invited">Invited</option><option value="suspended">Suspended</option></select>
+    <div class="input-wrap ml-auto" id="qwrap"></div>
+  </div>
+  <div id="table"></div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    BL.web.shell({ title: "Users", role: "admin", active: "users", onSearch: (q) => { document.getElementById("q").value = q; t.state.page = 0; t.draw(); } });
+    document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Name, email or phone" aria-label="Filter users" autocomplete="off">`;
+    const role = document.getElementById("role"), status = document.getElementById("status"), q = document.getElementById("q");
+    if (BL.qs("role")) role.value = BL.qs("role"); if (BL.qs("status")) status.value = BL.qs("status");
+    const sub = () => { document.getElementById("sub").textContent = `${BL.plural(state.users.filter((u) => u.role === "member" && u.status === "active").length, "active member")} · ${state.users.filter((u) => u.status === "invited").length} invited`; };
+    const rows = () => { const s = q.value.trim().toLowerCase(); return state.users.filter((u) => (!role.value || u.role === role.value) && (!status.value || u.status === status.value) && (!s || `${u.name} ${u.email} ${u.phone}`.toLowerCase().includes(s))); };
+    const t = BL.webTable(document.getElementById("table"), { rows, sort: "joined", dir: "desc", href: (u) => `admin-user.html?id=${u.id}`, pageSize: 10,
+      cols: [{ key: "name", label: "Name", render: (u) => `<span class="flex items-center gap-2 min-w-0"><span class="avatar sm">${BL.initials(u.name)}</span><span class="truncate">${esc(u.name)}</span></span>` }, { key: "email", label: "Email", render: (u) => `<span class="truncate muted">${esc(u.email)}</span>` }, { key: "role", label: "Role", render: (u) => u.role === "member" ? "Member" : u.role === "vendor" ? `Vendor${u.vendorId ? ` · ${esc(BL.vendor(u.vendorId).name)}` : ""}` : "Admin" }, { key: "plan", label: "Plan", render: (u) => esc(u.plan || "—") }, { key: "joined", label: "Joined", render: (u) => fdate(u.joined, "short") }, { key: "bookings", label: "Bookings", num: true, sort: (u) => BL.userStats(u.id).bookings, render: (u) => BL.userStats(u.id).bookings }, { key: "status", label: "Status", render: (u) => BL.badge(u.status) }],
+      card: (u) => ({ title: esc(u.name), meta: `${esc(u.email)} · ${u.role} · ${BL.plural(BL.userStats(u.id).bookings, "booking")}`, right: BL.badge(u.status) }),
+      empty: `<div class="empty panel"><span class="tile">${icon("users")}</span><h3>No one matches</h3><p>Try a different name, or clear the filters.</p><button class="btn btn-secondary btn-sm" id="clear">Clear filters</button></div>` });
+    sub();
+    [role, status].forEach((el) => el.addEventListener("change", () => { t.state.page = 0; t.draw(); }));
+    q.addEventListener("input", () => { t.state.page = 0; t.draw(); });
+    BL.on(document.getElementById("table"), "click", "#clear", () => { role.value = ""; status.value = ""; q.value = ""; t.draw(); });
+    document.getElementById("invite").addEventListener("click", () => {
+      BL.dialog({ title: "Invite someone", body: `<form id="inv" class="flex flex-col gap-3" novalidate><div class="field"><label class="label" for="nm">Name</label><input class="input" id="nm" name="name" autocomplete="off"><p class="error">A name is needed.</p></div><div class="field"><label class="label" for="em">Email</label><input class="input" id="em" name="email" type="email" inputmode="email" autocomplete="off"><p class="error">Enter an email address.</p></div><div class="field"><label class="label" for="rl">Role</label><select class="select" id="rl" name="role"><option value="member">Member</option><option value="vendor">Vendor account</option><option value="admin">Admin</option></select></div></form>`,
+        actions: [{ label: "Cancel" }, { label: "Send invite", kind: "primary", onClick: (close, host) => { const f = host.querySelector("#inv"); let bad = false; f.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); if (!f.name.value.trim()) { f.name.closest(".field").classList.add("is-invalid"); bad = true; } if (!/^\S+@\S+\.\S+$/.test(f.email.value.trim())) { f.email.closest(".field").classList.add("is-invalid"); bad = true; } if (bad) return; state.users.unshift({ id: BL.uid("u"), name: f.name.value.trim(), email: f.email.value.trim(), phone: "", role: f.role.value, plan: f.role.value === "member" ? "Standard" : "", status: "invited", joined: BL.day(0), city: "Tel Aviv" }); BL.save(); close(); BL.toast("Invite sent"); sub(); t.draw(); } }] });
+    });
+  })();
+</script>
+</body>
+</html>

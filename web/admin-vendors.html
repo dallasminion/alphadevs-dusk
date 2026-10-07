@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Vendors · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Vendors</h1><p id="sub"></p></div><button class="btn btn-primary" id="add">Add a vendor</button></div>
+  <div class="toolbar">
+    <select class="select" id="status" aria-label="Status"><option value="">Every status</option><option value="active">Active</option><option value="pending">Awaiting review</option><option value="suspended">Suspended</option></select>
+    <select class="select" id="cat" aria-label="Category"></select>
+    <div class="input-wrap ml-auto" id="qwrap"></div>
+  </div>
+  <div id="table"></div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    BL.web.shell({ title: "Vendors", role: "admin", active: "vendors", onSearch: (q) => { document.getElementById("q").value = q; t.state.page = 0; t.draw(); } });
+    document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Name or area" aria-label="Filter vendors" autocomplete="off">`;
+    const status = document.getElementById("status"), cat = document.getElementById("cat"), q = document.getElementById("q");
+    cat.innerHTML = `<option value="">Every category</option>${state.categories.map((c) => `<option value="${esc(c.id)}">${esc(c.id)}</option>`).join("")}`;
+    if (BL.qs("status")) status.value = BL.qs("status");
+    const sub = () => { const p = state.vendors.filter((v) => v.status === "pending").length; document.getElementById("sub").textContent = `${BL.plural(state.vendors.filter((v) => v.status === "active").length, "live vendor")}${p ? ` · ${p} awaiting review` : ""}`; };
+    const rows = () => { const s = q.value.trim().toLowerCase(); return state.vendors.filter((v) => (!status.value || v.status === status.value) && (!cat.value || v.category === cat.value) && (!s || `${v.name} ${v.area}`.toLowerCase().includes(s))); };
+    const bookingsOf = (v) => BL.bookingsForVendor(v.id).length;
+    const t = BL.webTable(document.getElementById("table"), { rows, sort: "name", href: (v) => `admin-vendor.html?id=${v.id}`, pageSize: 10,
+      cols: [{ key: "name", label: "Vendor", render: (v) => `<span class="flex items-center gap-2 min-w-0"><span class="tile">${icon(BL.categoryIcon(v.category), "sm")}</span><span class="truncate">${esc(v.name)}</span></span>` }, { key: "category", label: "Category", render: (v) => esc(v.category) }, { key: "area", label: "Area", render: (v) => esc(v.area) }, { key: "rating", label: "Rating", num: true, render: (v) => v.reviews ? `${v.rating.toFixed(1)} <span class="muted">(${v.reviews})</span>` : "—" }, { key: "bookings", label: "Bookings", num: true, sort: bookingsOf, render: bookingsOf }, { key: "commission", label: "Commission", num: true, render: (v) => `${v.commission}%` }, { key: "joined", label: "Joined", render: (v) => fdate(v.joined, "short") }, { key: "status", label: "Status", render: (v) => BL.badge(v.status) }],
+      card: (v) => ({ title: esc(v.name), meta: `${esc(v.category)} · ${esc(v.area)} · ${v.commission}% commission`, right: BL.badge(v.status) }),
+      empty: `<div class="empty panel"><span class="tile">${icon("store")}</span><h3>No vendors match</h3><p>Clear a filter, or add the vendor yourself.</p><button class="btn btn-secondary btn-sm" id="clear">Clear filters</button></div>` });
+    sub();
+    [status, cat].forEach((el) => el.addEventListener("change", () => { t.state.page = 0; t.draw(); }));
+    q.addEventListener("input", () => { t.state.page = 0; t.draw(); });
+    BL.on(document.getElementById("table"), "click", "#clear", () => { status.value = ""; cat.value = ""; q.value = ""; t.draw(); });
+    document.getElementById("add").addEventListener("click", () => {
+      BL.dialog({ title: "Add a vendor", body: `<form id="vf" class="grid grid-cols-1 md:grid-cols-2 gap-3" novalidate><div class="field md:col-span-2"><label class="label" for="nm">Name</label><input class="input" id="nm" name="name" autocomplete="off"><p class="error">A name is needed.</p></div><div class="field"><label class="label" for="ct">Category</label><select class="select" id="ct" name="category">${state.categories.map((c) => `<option>${esc(c.id)}</option>`).join("")}</select></div><div class="field"><label class="label" for="ar">Area</label><input class="input" id="ar" name="area" placeholder="Jaffa" autocomplete="off"></div><div class="field"><label class="label" for="cn">Contact name</label><input class="input" id="cn" name="contact" autocomplete="off"></div><div class="field"><label class="label" for="ce">Contact email</label><input class="input" id="ce" name="email" type="email" inputmode="email" autocomplete="off"></div><div class="field"><label class="label" for="cm">Commission %</label><input class="input num" id="cm" name="commission" type="number" inputmode="numeric" min="0" max="50" value="15"></div></form><p class="help mt-3">The vendor starts as awaiting review. Approve them from their page once the details are checked.</p>`,
+        actions: [{ label: "Cancel" }, { label: "Add vendor", kind: "primary", onClick: (close, host) => { const f = host.querySelector("#vf"); f.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); if (!f.name.value.trim()) { f.name.closest(".field").classList.add("is-invalid"); return; } const id = BL.uid("v"); state.vendors.push({ id, name: f.name.value.trim(), category: f.category.value, area: f.area.value.trim() || "Tel Aviv", rating: 0, reviews: 0, priceLevel: 2, status: "pending", commission: Number(f.commission.value) || 15, description: "", hours: "", contact: { name: f.contact.value.trim(), phone: "", email: f.email.value.trim() }, joined: BL.day(0), payout: "Bank transfer" }); state.log.unshift({ at: BL.nowIso(), text: `${f.name.value.trim()} added as a vendor` }); BL.save(); close(); BL.toast("Vendor added"); location.href = `admin-vendor.html?id=${id}`; } }] });
+    });
+  })();
+</script>
+</body>
+</html>

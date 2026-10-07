@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Vendor · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const v = BL.vendor(BL.qs("id"));
+    BL.web.shell({ title: v ? v.name : "Vendor", role: "admin", active: "vendors" });
+    const view = document.getElementById("view");
+    if (!v) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("store")}</span><h3>No such vendor</h3><a class="btn btn-primary btn-sm" href="admin-vendors.html">All vendors</a></div>`; return; }
+    function draw() {
+      const rep = BL.reportTotals(); const rev = rep.byVendor[v.id] || 0;
+      const all = BL.bookingsForVendor(v.id).sort((a, b) => b.booking.createdAt.localeCompare(a.booking.createdAt));
+      const offers = state.offers.filter((o) => o.vendorId === v.id); const events = state.events.filter((e) => e.vendorId === v.id);
+      const acct = state.users.find((u) => u.vendorId === v.id);
+      view.innerHTML = `
+        <div class="crumbs"><a href="admin-vendors.html">Vendors</a>${icon("chevron-right", "sm")}<span>${esc(v.name)}</span></div>
+        <div class="page-head"><div class="min-w-0"><h1 class="truncate">${esc(v.name)}</h1><p>${esc(v.category)} · ${esc(v.area)} · ${BL.priceLevel(v.priceLevel)}${v.reviews ? ` · ${v.rating.toFixed(1)} from ${BL.plural(v.reviews, "review")}` : ""}</p></div><div class="flex gap-2 items-center flex-wrap">${BL.badge(v.status)}<button class="btn btn-secondary" id="edit">Edit</button>${v.status === "pending" ? `<button class="btn btn-secondary" id="reject">Reject</button><button class="btn btn-primary" id="approve">Approve</button>` : v.status === "active" ? `<button class="btn btn-secondary" id="susp">Suspend</button>` : `<button class="btn btn-primary" id="react">Reactivate</button>`}</div></div>
+        ${v.status === "pending" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">Applied ${fdate(v.joined, "long")}. Approving makes the listing live and turns their ${BL.plural(offers.filter((o) => o.status === "draft").length, "draft offer")} active.</p></div>` : v.status === "suspended" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("ban", "sm")}<p class="text-sm">Suspended${v.statusReason ? `: ${esc(v.statusReason)}` : ""}. Members cannot see or book this vendor.</p></div>` : ""}
+        <div class="split">
+          <div>
+            <div class="grid-stats mb-6"><div class="stat panel p-4"><span class="value">${all.length}</span><span class="label muted">Bookings</span></div><div class="stat panel p-4"><span class="value">${money(rev)}</span><span class="label muted">Booked value</span></div><div class="stat panel p-4"><span class="value">${money(rev * v.commission / 100)}</span><span class="label muted">Commission at ${v.commission}%</span></div><div class="stat panel p-4"><span class="value">${offers.filter((o) => o.status === "active").length}</span><span class="label muted">Live offers</span></div></div>
+            <section class="section"><div class="section-title"><h2>Offers</h2><a href="admin-offer.html?new=1&vendor=${v.id}">New offer</a></div><div id="offers"></div></section>
+            <section class="section"><div class="section-title"><h2>Events</h2><a href="admin-event.html?new=1&vendor=${v.id}">New event</a></div><div id="events"></div></section>
+            <section class="section"><div class="section-title"><h2>Recent bookings</h2><a href="admin-bookings.html?q=${encodeURIComponent(v.name)}">All</a></div>
+              ${all.length ? `<div class="panel px-4">${all.slice(0, 6).map(({ booking, items }) => `<a class="row press" href="admin-booking.html?id=${booking.id}"><span class="tile num text-sm">${items[0].time}</span><span class="body"><span class="title block truncate">${esc(BL.user(booking.userId).name)} · ${booking.code}</span><span class="sub block truncate">${items.map((i) => esc(BL.offer(i.offerId).title)).join(", ")} · ${fdate(items[0].date)}</span></span><span class="right">${BL.badge(items.length === 1 ? items[0].status : booking.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>No bookings yet</h3><p>Nothing has been booked here through Blissers.</p></div>`}
+            </section>
+          </div>
+          <div>
+            <section class="section"><div class="section-title"><h2>About</h2><a href="../ios/vendor.html?id=${v.id}">Public page</a></div>
+              <div class="card">${v.description ? `<p class="text-sm muted mb-3">${esc(v.description)}</p>` : ""}<div class="kv"><dt>Hours</dt><dd>${esc(v.hours || "—")}</dd></div><div class="kv"><dt>Contact</dt><dd>${esc(v.contact.name || "—")}</dd></div><div class="kv"><dt>Phone</dt><dd>${v.contact.phone ? `<a href="tel:${esc(v.contact.phone.replace(/\s/g, ""))}">${esc(v.contact.phone)}</a>` : "—"}</dd></div><div class="kv"><dt>Email</dt><dd>${v.contact.email ? `<a href="mailto:${esc(v.contact.email)}">${esc(v.contact.email)}</a>` : "—"}</dd></div><div class="kv"><dt>Payout</dt><dd>${esc(v.payout || "—")}</dd></div><div class="kv"><dt>Commission</dt><dd>${v.commission}%</dd></div><div class="kv"><dt>Joined</dt><dd>${fdate(v.joined, "long")}</dd></div>${acct ? `<div class="kv"><dt>Portal login</dt><dd><a href="admin-user.html?id=${acct.id}">${esc(acct.name)}</a></dd></div>` : ""}</div>
+            </section>
+          </div>
+        </div>`;
+      BL.webTable(document.getElementById("offers"), { rows: offers, sort: "title", href: (o) => `admin-offer.html?id=${o.id}`, pageSize: 6,
+        cols: [{ key: "title", label: "Offer", render: (o) => `<span class="truncate">${esc(o.title)}</span>` }, { key: "price", label: "Price", num: true, render: (o) => `${money(o.price)} <span class="muted">${esc(o.unit)}</span>` }, { key: "status", label: "Status", render: (o) => BL.badge(o.status) }],
+        card: (o) => ({ title: esc(o.title), meta: `${money(o.price)} ${esc(o.unit)}`, right: BL.badge(o.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("tag")}</span><h3>No offers</h3><p>The concierge cannot book a vendor without one.</p><a class="btn btn-secondary btn-sm" href="admin-offer.html?new=1&vendor=${v.id}">New offer</a></div>` });
+      BL.webTable(document.getElementById("events"), { rows: events, sort: "date", href: (e) => `admin-event.html?id=${e.id}`, pageSize: 6,
+        cols: [{ key: "title", label: "Event", render: (e) => `<span class="truncate">${esc(e.title)}</span>` }, { key: "date", label: "When", render: (e) => `${fdate(e.date)} · ${e.time}` }, { key: "sold", label: "Sold", num: true, render: (e) => `${e.sold} / ${e.capacity}` }, { key: "status", label: "Status", render: (e) => BL.badge(e.status) }],
+        card: (e) => ({ title: esc(e.title), meta: `${fdate(e.date)} · ${e.time} · ${e.sold} of ${e.capacity} sold`, right: BL.badge(e.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No events</h3><p>Ticketed nights for this vendor appear here.</p></div>` });
+    }
+    draw();
+    BL.on(view, "click", "#approve", async () => { if (!(await BL.confirm({ title: `Approve ${v.name}?`, body: "The listing goes live and the concierge can book it from now on.", ok: "Approve" }))) return; BL.setVendorStatus(v.id, "active", ""); BL.toast("Approved. The listing is live."); draw(); });
+    BL.on(view, "click", "#reject, #susp", (e, b) => {
+      const susp = b.id === "susp";
+      BL.dialog({ title: susp ? `Suspend ${esc(v.name)}?` : `Reject ${esc(v.name)}?`, body: `<p class="text-sm muted mb-4">${susp ? "Members stop seeing the listing at once. Confirmed bookings stay in place." : "The vendor is told the application was not accepted. You can reactivate them later."}</p><div class="field"><label class="label" for="why">Reason</label><input class="input" id="why" placeholder="${susp ? "Three no-shows this month" : "Licence not provided"}" autocomplete="off"><p class="error">Give a reason; the vendor sees it.</p></div>`,
+        actions: [{ label: "Cancel" }, { label: susp ? "Suspend" : "Reject", kind: "danger", onClick: (close, host) => { const r = host.querySelector("#why").value.trim(); if (!r) { host.querySelector(".field").classList.add("is-invalid"); return; } BL.setVendorStatus(v.id, "suspended", r); close(); BL.toast(susp ? "Suspended" : "Rejected"); draw(); } }] });
+    });
+    BL.on(view, "click", "#react", async () => { if (!(await BL.confirm({ title: `Reactivate ${v.name}?`, body: "The listing is visible and bookable again.", ok: "Reactivate" }))) return; BL.setVendorStatus(v.id, "active", ""); BL.toast("Listing is live again"); draw(); });
+    BL.on(view, "click", "#edit", () => {
+      BL.dialog({ title: "Edit vendor", wide: true, body: `<form id="vf" class="grid grid-cols-1 md:grid-cols-2 gap-3" novalidate><div class="field md:col-span-2"><label class="label" for="nm">Name</label><input class="input" id="nm" name="name" value="${esc(v.name)}"><p class="error">A name is needed.</p></div><div class="field"><label class="label" for="ct">Category</label><select class="select" id="ct" name="category">${state.categories.map((c) => `<option ${c.id === v.category ? "selected" : ""}>${esc(c.id)}</option>`).join("")}</select></div><div class="field"><label class="label" for="ar">Area</label><input class="input" id="ar" name="area" value="${esc(v.area)}"></div><div class="field"><label class="label" for="hr">Hours</label><input class="input" id="hr" name="hours" value="${esc(v.hours || "")}" placeholder="12:00–23:30"></div><div class="field"><label class="label" for="cm">Commission %</label><input class="input num" id="cm" name="commission" type="number" inputmode="numeric" min="0" max="50" value="${v.commission}"><p class="error">0 to 50.</p></div><div class="field"><label class="label" for="cn">Contact name</label><input class="input" id="cn" name="contact" value="${esc(v.contact.name || "")}"></div><div class="field"><label class="label" for="cp">Contact phone</label><input class="input num" id="cp" name="phone" type="tel" inputmode="tel" value="${esc(v.contact.phone || "")}"></div><div class="field"><label class="label" for="ce">Contact email</label><input class="input" id="ce" name="email" type="email" inputmode="email" value="${esc(v.contact.email || "")}"></div><div class="field"><label class="label" for="po">Payout</label><select class="select" id="po" name="payout">${["Bank transfer", "Weekly bank transfer", "Monthly bank transfer"].map((p) => `<option ${p === v.payout ? "selected" : ""}>${p}</option>`).join("")}</select></div><div class="field md:col-span-2"><label class="label" for="ds">Description</label><textarea class="textarea" id="ds" name="description" rows="3">${esc(v.description || "")}</textarea></div></form>`,
+        actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: (close, host) => { const f = host.querySelector("#vf"); let bad = false; f.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); if (!f.name.value.trim()) { f.name.closest(".field").classList.add("is-invalid"); bad = true; } const cm = Number(f.commission.value); if (!(cm >= 0 && cm <= 50)) { f.commission.closest(".field").classList.add("is-invalid"); bad = true; } if (bad) return; BL.saveVendor({ id: v.id, name: f.name.value.trim(), category: f.category.value, area: f.area.value.trim(), hours: f.hours.value.trim(), commission: cm, payout: f.payout.value, description: f.description.value.trim(), contact: { name: f.contact.value.trim(), phone: f.phone.value.trim(), email: f.email.value.trim() } }); close(); BL.toast("Saved"); draw(); } }] });
+    });
+  })();
+</script>
+</body>
+</html>

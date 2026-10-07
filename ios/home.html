@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Home / Explore">
+<title>Home · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <h1 class="large-title" id="greet">Hi</h1>
+  <div id="view" class="stagger"></div>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    BL.ios.shell({ title: "Home", tab: "home", large: true, right: `<a class="btn btn-ghost btn-icon" href="wallet.html" aria-label="Wallet">${icon("wallet")}</a>` });
+    const p = state.profile;
+    const h = new Date().getHours();
+    const first = p.name.split(" ")[0];
+    document.getElementById("greet").innerHTML = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${esc(first)}<small>${fdate(BL.day(0), "long")}</small>`;
+
+    const nb = BL.nextBooking();
+    const held = BL.myTickets().find((t) => t.status === "held");
+    const forYou = state.offers.filter((o) => o.status === "active" && BL.vendor(o.vendorId).status === "active" && p.interests.includes(BL.vendor(o.vendorId).category)).slice(0, 8);
+    const week = state.events.filter((e) => e.status !== "past" && BL.daysUntil(e.date) >= 0 && BL.daysUntil(e.date) <= 7).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
+
+    const ocard = (o) => { const v = BL.vendor(o.vendorId); return `<a class="ocard" href="offer.html?id=${o.id}"><span class="art">${icon(BL.categoryIcon(v.category), "lg")}</span><span class="name">${esc(o.title)}</span><span class="meta">${esc(v.name)} · ${esc(v.area)}</span><span class="foot"><span>${money(o.price)}</span><span class="muted">${esc(o.unit)}</span></span></a>`; };
+
+    document.getElementById("view").innerHTML = `
+      <form class="input-wrap mb-5" id="search" role="search">${icon("search", "sm")}<input class="input" type="search" name="q" placeholder="Search places, offers, events" aria-label="Search" autocomplete="off" enterkeyhint="search"></form>
+
+      <a class="hero block p-5 mb-7 pressable" href="concierge.html">
+        <span class="flex items-center gap-2 text-sm text-white/80 mb-3">${icon("sparkle", "sm")}Concierge</span>
+        <span class="block text-[22px] leading-tight font-medium text-white">Say what you want to do tonight. One swipe books all of it.</span>
+        <span class="btn btn-primary btn-sm mt-4">Start a plan ${icon("arrow-right", "sm")}</span>
+      </a>
+
+      <section class="section">
+        <div class="section-title"><h2>Coming up</h2><a href="bookings.html">All bookings</a></div>
+        ${nb ? `<a class="group row press block" href="booking.html?id=${nb.id}" style="padding:12px 16px">
+            <span class="tile">${icon("calendar")}</span>
+            <span class="body"><span class="title block truncate">${esc(nb.title)}</span><span class="sub block truncate">${BL.bookingWhen(nb)} · ${BL.stops(nb)} · ${money(nb.total)}</span></span>
+            <span class="right">${BL.badge(nb.status)}</span></a>`
+          : `<div class="empty" style="padding:28px 20px"><h3>Nothing booked yet</h3><p>Tell the concierge what you’d like to do and it will be here.</p></div>`}
+        ${held ? `<a class="row press mt-2" href="ticket.html?id=${held.id}">${icon("ticket", "sm")}<span class="body"><span class="title block truncate">${esc(BL.event(held.eventId).title)}</span><span class="sub">Tickets on hold, <span data-countdown="${held.holdUntil}">${BL.timeLeft(held.holdUntil - Date.now())}</span> left to pay</span></span>${icon("chevron-right", "sm chev")}</a>` : ""}
+      </section>
+
+      <section class="section">
+        <div class="section-title"><h2>For you</h2><a href="explore.html">Explore</a></div>
+        ${forYou.length ? `<div class="hscroll">${forYou.map(ocard).join("")}</div>` : `<div class="empty"><h3>No matches yet</h3><p>Pick a few interests on your profile.</p></div>`}
+      </section>
+
+      <section class="section">
+        <div class="section-title"><h2>Browse</h2></div>
+        <div class="chips">${state.categories.map((c) => `<a class="chip" href="explore.html?cat=${encodeURIComponent(c.id)}" style="min-height:40px;padding:6px 14px">${icon(c.icon, "sm")}${esc(c.id)}</a>`).join("")}</div>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><h2>This week</h2><a href="events.html">All events</a></div>
+        ${week.length ? `<div class="group">${week.map((e) => `<a class="row press" href="event.html?id=${e.id}"><span class="tile" style="width:44px;height:44px;flex-direction:column;line-height:1.05"><b class="text-[15px]">${BL.parseIso(e.date).getDate()}</b><small class="text-[10px] muted uppercase">${fdate(e.date, "short").split(" ")[2]}</small></span><span class="body"><span class="title block truncate">${esc(e.title)}</span><span class="sub block truncate">${fdate(e.date)} ${e.time} · ${esc(e.venue)}</span></span><span class="right">${e.status === "sold_out" ? BL.badge("sold_out") : e.price ? money(e.price) : "Free"}</span></a>`).join("")}</div>`
+          : `<div class="empty"><h3>Quiet week</h3><p>Nothing on in the next seven days.</p></div>`}
+      </section>`;
+    Array.from(document.getElementById("view").children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+
+    document.getElementById("search").addEventListener("submit", (e) => { e.preventDefault(); location.href = `explore.html?q=${encodeURIComponent(e.target.q.value.trim())}`; });
+    const cd = document.querySelector("[data-countdown]");
+    if (cd) setInterval(() => { const left = Number(cd.dataset.countdown) - Date.now(); cd.textContent = BL.timeLeft(left); if (left <= 0) { BL.expireHolds(); location.reload(); } }, 1000);
+  })();
+</script>
+</body>
+</html>

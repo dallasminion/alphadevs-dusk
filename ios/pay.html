@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Payment & Swipe to Confirm">
+<title>Pay · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content" style="padding-bottom:150px"><div id="view"></div></main>
+<div class="ios-cta" id="cta" hidden>
+  <div class="swipe" id="swipe"><span class="track" id="track">Swipe to pay</span><button type="button" class="knob" id="knob" aria-label="Swipe to pay">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button></div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const planId = BL.qs("plan"), ticketId = BL.qs("tickets");
+    const p = planId && BL.plan(planId);
+    const t = ticketId && BL.ticket(ticketId);
+    const ev = t && BL.event(t.eventId);
+    const back = p ? `plan.html?id=${p.id}` : t ? `ticket.html?id=${t.id}` : "home.html";
+    BL.ios.shell({ title: "Pay", back, backLabel: p ? "Plan" : t ? "Ticket" : "Home" });
+    const view = document.getElementById("view"), cta = document.getElementById("cta");
+    const amt = () => p ? p.total : t ? ev.price * t.qty : 0;
+    const METHODS = [["Visa •• 4242", "card"], ["Apple Pay", "phoneDevice"], ["Mastercard •• 8810", "card"], ["Wallet", "wallet"]];
+    let method = "Visa •• 4242", outcome = "success";
+    const OUTCOMES = p ? [["success", "Success"], ["requote", "Price changed"], ["nohold", "Hold failed"], ["failed", "Failed"], ["pending", "Pending"], ["partial", "Partial refund"]] : [["success", "Success"], ["failed", "Failed"]];
+
+    if (!p && !t) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("card")}</span><h3>Nothing to pay</h3><p>Pick a plan or a ticket first.</p><a class="btn btn-primary btn-sm" href="home.html">Home</a></div>`; return; }
+    if (p && p.status === "booked") { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("check-circle")}</span><h3>Already paid</h3><p>This plan became a booking.</p><a class="btn btn-primary btn-sm" href="booking.html?id=${p.bookingId}">Open the booking</a></div>`; return; }
+    if (t && t.status !== "held") { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("ticket")}</span><h3>${t.status === "paid" || t.status === "checked_in" ? "Already paid" : "The hold ran out"}</h3><p>${t.status === "released" ? "Pick the tickets again, you get ten minutes to pay." : "The tickets are yours."}</p><a class="btn btn-primary btn-sm" href="${t.status === "released" ? `event.html?id=${ev.id}` : `ticket.html?id=${t.id}`}">${t.status === "released" ? "Back to the event" : "View ticket"}</a></div>`; return; }
+
+    const sorted = () => p.items.slice().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+    const vendorsOf = () => [...new Set(p.items.map((i) => i.vendorId))].length;
+    function form() {
+      const amount = amt();
+      const wallet = state.profile.walletBalance; const short = wallet < amount;
+      const bs = p ? BL.budgetStatus(p.total, p.frame && p.frame.budget) : null;
+      view.innerHTML = `
+        <h1 class="large-title">${money(amount)}<small>${p ? `${esc(p.title)} · ${fdate(p.date)} · ${BL.plural(p.guests, "guest")}` : `${esc(ev.title)} · ${BL.plural(t.qty, "ticket")}`}</small></h1>
+        <section class="section">
+          <div class="section-title"><h2>${p ? "What you’re paying for" : "Tickets"}</h2></div>
+          <div class="group">
+            ${p ? sorted().map((it) => { const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId); const sh = BL.bookingShape(o); return `<div class="row"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub block truncate">${p.scope === "trip" ? `${fdate(it.date)} ` : ""}${it.time} · ${esc(v.name)} · ${esc(sh.pay)}</span></span><span class="right num">${money(it.price)}</span></div>`; }).join("")
+              : `<div class="row"><span class="body"><span class="title block truncate">${esc(ev.title)}</span><span class="sub block truncate">${fdate(ev.date)} ${ev.time} · ${esc(ev.venue)}</span></span><span class="right num">${t.qty} × ${money(ev.price)}</span></div>`}
+            <div class="row" style="min-height:48px"><span class="body"><span class="title">Total</span>${p ? `<span class="sub">One charge, split between ${vendorsOf()} ${vendorsOf() === 1 ? "vendor" : "vendors"}</span>` : ""}</span><span class="right num font-medium">${money(amount)}</span></div>
+          </div>
+          ${bs && bs.key !== "normal" && bs.key !== "none" ? `<p class="text-sm mt-2 ${bs.tone === "bad" ? "text-[var(--bad)]" : "muted"}">${esc(bs.label)}.</p>` : ""}
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Pay with</h2></div>
+          <div class="group" role="radiogroup" aria-label="Payment method">
+            ${METHODS.map(([m, ic]) => { const dis = m === "Wallet" && short; return `<button class="row press" role="radio" aria-checked="${m === method}" data-method="${esc(m)}" ${dis ? "disabled" : ""}>${icon(ic, "sm")}<span class="body"><span class="title">${esc(m)}</span>${m === "Wallet" ? `<span class="sub">${money(wallet)} available${dis ? `, ${money(amount - wallet)} short` : ""}</span>` : ""}</span><span class="right">${m === method ? icon("check", "sm") : ""}</span></button>`; }).join("")}
+          </div>
+          ${short ? `<a class="btn btn-ghost btn-sm mt-2" href="wallet.html">Top up the wallet</a>` : ""}
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>${p ? "What the vendors do" : "Bank answer"}</h2></div>
+          <div class="seg" role="group" aria-label="Sandbox outcome" style="flex-wrap:wrap">${OUTCOMES.map(([k, l]) => `<button class="${k === outcome ? "is-on" : ""}" data-outcome="${k}" aria-pressed="${k === outcome}">${l}</button>`).join("")}</div>
+          <p class="help mt-2">Demo only. Pick how the ${p ? "holds, the charge and the confirmations" : "payment"} should go, then swipe.</p>
+        </section>
+        <p class="muted text-caption">${p ? "Every vendor holds its slot first. The charge happens only once each hold is in, and a stop a vendor can’t honour afterwards is refunded to this method straight away." : "Tickets are final once paid, and go to your wallet instantly."}</p>`;
+      cta.hidden = false;
+      document.getElementById("knob").setAttribute("aria-label", `Swipe to pay ${money(amount)} with ${method}`);
+      document.getElementById("track").textContent = `Swipe to pay ${money(amount)}`;
+    }
+    form();
+    BL.on(view, "click", "[data-method]", (e, b) => { method = b.dataset.method; form(); });
+    BL.on(view, "click", "[data-outcome]", (e, b) => { outcome = b.dataset.outcome; form(); });
+
+    const sw = document.getElementById("swipe"), knob = document.getElementById("knob"), track = document.getElementById("track");
+    let dragging = false, startX = 0, max = 0, x = 0;
+    knob.addEventListener("pointerdown", (e) => { if (sw.classList.contains("is-done")) return; dragging = true; startX = e.clientX; max = sw.clientWidth - knob.offsetWidth - 8; knob.setPointerCapture(e.pointerId); sw.classList.add("is-dragging"); });
+    knob.addEventListener("pointermove", (e) => { if (!dragging) return; x = Math.max(0, Math.min(max, e.clientX - startX)); knob.style.transform = `translateX(${x}px)`; track.style.opacity = String(1 - x / max); });
+    const end = () => { if (!dragging) return; dragging = false; sw.classList.remove("is-dragging"); if (x > max * 0.7) go(); else { knob.style.transform = ""; track.style.opacity = ""; } x = 0; };
+    knob.addEventListener("pointerup", end); knob.addEventListener("pointercancel", end);
+    knob.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+
+    const screen = (html) => { view.innerHTML = html; view.classList.remove("screen"); void view.offsetWidth; view.classList.add("screen"); document.getElementById("content").scrollTop = 0; };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    function go() {
+      if (sw.classList.contains("is-done")) return;
+      sw.classList.add("is-done"); knob.style.transform = ""; track.style.opacity = ""; track.textContent = p ? "Holding…" : "Paying…";
+      if (p) holdFirst(); else setTimeout(payTix, 1100);
+    }
+    const resetSwipe = () => { sw.classList.remove("is-done"); knob.style.transform = ""; track.style.opacity = ""; cta.hidden = true; };
+    const charging = () => screen(`<div class="flex flex-col items-center justify-center text-center gap-4" style="min-height:60vh"><span class="skeleton" style="width:72px;height:72px;border-radius:50%"></span><h2>Charging ${esc(method)}</h2><p class="muted">${money(amt())}</p>${p && p.holdUntil ? `<p class="hold">Holds good for ${Math.max(1, Math.round((p.holdUntil - Date.now()) / 60000))} min</p>` : ""}</div>`);
+
+    /* The architecture doc's saga: every vendor holds first, a changed quote or a failed hold is
+       settled with the member, and only then does the single charge go out. */
+    async function holdFirst() {
+      const items = sorted(); cta.hidden = true;
+      screen(`<h1 class="large-title">Holding with vendors<small>${esc(p.title)} · nothing charged yet</small></h1><div class="timeline" id="steps">${items.map((it, i) => { const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId); return `<div class="stop wait" data-step="${i}"><div class="flex items-start justify-between gap-3"><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(o.title)}</p><p class="muted text-sm truncate">${it.time} · ${esc(v.name)}</p><p class="text-sm mt-1" data-note>${esc(BL.bookingShape(o).hold)}…</p></div><span data-badge>${BL.badge("pending")}</span></div></div>`; }).join("")}</div>`);
+      const res = BL.holdPlan(p.id, outcome === "requote" ? "requote" : outcome === "nohold" ? "nohold" : null);
+      for (let i = 0; i < items.length; i++) {
+        await wait(700);
+        const it = p.items[p.items.indexOf(items[i])]; const v = BL.vendor(it.vendorId); const el = view.querySelector(`[data-step="${i}"]`);
+        const change = res.changes.find((c) => p.items[c.idx] === it); const failed = it.hold && it.hold.status === "failed";
+        el.classList.remove("wait"); el.classList.add(failed ? "bad" : "ok");
+        el.querySelector("[data-badge]").innerHTML = BL.badge(failed ? "declined" : "confirmed").replace("Declined", "No hold").replace("Confirmed", "Held");
+        el.querySelector("[data-note]").textContent = failed ? `${v.name} could not hold ${it.time}.` : change ? `Held. Quote moved from ${money(change.from)} to ${money(change.to)}.` : `${v.name} is holding ${it.time}.`;
+      }
+      await wait(500);
+      if (res.failed !== null) return holdFailed(res.failed);
+      if (res.changes.length) return requote(res.changes);
+      charging(); setTimeout(payPlan, 1100);
+    }
+    function requote(changes) {
+      const c = changes[0]; const it = p.items[c.idx]; const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId);
+      const newTotal = p.total - c.from + c.to; const bs = BL.budgetStatus(newTotal, p.frame && p.frame.budget);
+      screen(`<div class="flex flex-col items-center text-center gap-3 pt-8"><span class="tile" style="width:72px;height:72px;color:var(--wait)">${icon("alert", "lg")}</span><h1 style="font-size:24px">The price moved</h1>
+        <p class="muted">${esc(v.name)} quotes ${esc(o.title)} at ${money(c.to)} now, ${money(c.to - c.from)} more than when I planned it. Every hold is still in place and nothing is charged.</p>
+        <div class="group w-full mt-3 text-left"><div class="kv"><dt>Was</dt><dd class="num">${money(p.total)}</dd><dt>Now</dt><dd class="num">${money(newTotal)}</dd><dt>Against the budget</dt><dd>${esc(bs.key === "none" ? "No budget set" : bs.label)}</dd></div></div>
+        <button class="btn btn-primary btn-lg btn-block mt-4" id="accept">Pay ${money(newTotal)}</button><button class="btn btn-ghost btn-block" id="decline">Let the holds go</button></div>`);
+      BL.on(view, "click", "#accept", () => { BL.acceptRequote(p.id); BL.save(); charging(); setTimeout(payPlan, 1100); });
+      BL.on(view, "click", "#decline", () => { BL.releasePlanHolds(p.id); BL.toast("Holds released, nothing charged"); location.href = `plan.html?id=${p.id}`; });
+    }
+    function holdFailed(idx) {
+      const it = p.items[idx]; const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId);
+      const alts = BL.alternativesFor(it, it.guests).slice(0, 3);
+      screen(`<div class="flex flex-col items-center text-center gap-3 pt-8"><span class="tile" style="width:72px;height:72px;color:var(--bad)">${icon("x-circle", "lg")}</span><h1 style="font-size:24px">${esc(v.name)} could not hold it</h1>
+        <p class="muted">${esc(o.title)} at ${it.time} is gone. The other ${p.items.length - 1 === 1 ? "hold is" : "holds are"} still in place and nothing is charged. Swap it, drop it, or let everything go.</p>
+        ${alts.length ? `<section class="section w-full text-left mt-2"><div class="section-title"><h2>Same slot, nearby</h2></div><div class="group">${alts.map((a) => { const av = BL.vendor(a.vendorId); const pr = BL.itemPrice(a, it.guests) * (it.nights || 1); return `<button class="row press" data-alt="${a.id}"><span class="body"><span class="title block truncate">${esc(a.title)}</span><span class="sub block truncate">${esc(av.name)} · ${esc(av.area)}</span></span><span class="right num">${money(pr)}</span></button>`; }).join("")}</div></section>` : ""}
+        <button class="btn btn-secondary btn-lg btn-block mt-2" id="drop">Drop it, keep the rest</button><button class="btn btn-ghost btn-block" id="release">Let every hold go</button></div>`);
+      BL.on(view, "click", "[data-alt]", (e, b) => { BL.releasePlanHolds(p.id); BL.swapPlanItem(p.id, idx, b.dataset.alt); BL.save(); outcome = "success"; BL.toast("Swapped. Holding again"); sw.classList.remove("is-done"); go(); });
+      BL.on(view, "click", "#drop", () => { BL.releasePlanHolds(p.id); BL.removePlanItem(p.id, idx); BL.save(); outcome = "success"; if (!p.items.length) { location.href = `plan.html?id=${p.id}`; return; } BL.toast("Dropped. Holding again"); sw.classList.remove("is-done"); go(); });
+      BL.on(view, "click", "#release", () => { BL.releasePlanHolds(p.id); BL.toast("Holds released, nothing charged"); location.href = `plan.html?id=${p.id}`; });
+    }
+
+    async function payPlan() {
+      const res = BL.payPlan(p.id, method, outcome === "failed" ? "failed" : outcome === "pending" ? "pending" : "success");
+      if (!res.ok) { BL.releasePlanHolds(p.id); resetSwipe(); return screen(failed(res.payment.failReason)); }
+      const b = res.booking; cta.hidden = true;
+      if (outcome === "pending") {
+        screen(`<div class="flex flex-col items-center text-center gap-3 pt-10"><span class="tile" style="width:72px;height:72px;color:var(--wait)">${icon("clock", "lg")}</span><h1 style="font-size:24px">Bank is verifying</h1><p class="muted">${esc(method)} asked for a second look. The holds stay in place, nothing is confirmed with vendors until it clears, and your money isn’t taken.</p>
+          <div class="group w-full mt-4 text-left"><div class="row"><span class="body"><span class="title">${esc(b.title)}</span><span class="sub">${b.code} · ${money(b.total)}</span></span><span class="right">${BL.badge("pending")}</span></div></div>
+          <button class="btn btn-primary btn-lg btn-block mt-4" id="approve">Simulate bank approval</button><a class="btn btn-ghost btn-block" href="booking.html?id=${b.id}">Keep waiting, view booking</a></div>`);
+        document.getElementById("approve").addEventListener("click", async () => { BL.settlePending(b.paymentId); BL.toast("Payment cleared"); await confirmVendors(b); });
+        return;
+      }
+      await confirmVendors(b);
+    }
+    async function confirmVendors(b) {
+      const items = b.items.slice().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+      screen(`<h1 class="large-title">Confirming with vendors<small>${esc(b.title)} · ${b.code}</small></h1><div class="timeline" id="steps">${items.map((it, i) => { const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId); return `<div class="stop wait" data-step="${i}"><div class="flex items-start justify-between gap-3"><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(o.title)}</p><p class="muted text-sm truncate">${it.time} · ${esc(v.name)}</p><p class="text-sm mt-1" data-note>Waiting for ${esc(v.name)}…</p></div><span data-badge>${BL.badge("pending")}</span></div></div>`; }).join("")}</div>`);
+      for (let i = 0; i < items.length; i++) {
+        await wait(900);
+        const it = items[i]; const v = BL.vendor(it.vendorId); const o = BL.offer(it.offerId);
+        const declineThis = outcome === "partial" && i === items.length - 1 && items.length > 0;
+        BL.vendorDecide(b.id, it.offerId, declineThis ? "decline" : "confirm", "Fully booked at that time");
+        const fresh = BL.booking(b.id).items.find((x) => x.offerId === it.offerId);
+        const el = view.querySelector(`[data-step="${i}"]`);
+        el.classList.remove("wait"); el.classList.add(declineThis ? "bad" : "ok");
+        el.querySelector("[data-badge]").innerHTML = BL.badge(declineThis ? "declined" : "confirmed");
+        el.querySelector("[data-note]").textContent = declineThis ? `${v.name} is fully booked at ${it.time}. ${money(it.price)} refunded to ${method}.` : fresh && fresh.voucher ? `${v.name} confirmed. ${BL.bookingShape(o).wallet}, ${fresh.voucher}.` : `${v.name} confirmed ${it.time}. ${BL.bookingShape(o).after}.`;
+        BL.toast(declineThis ? `${o.title} refunded` : `${v.name} confirmed`);
+      }
+      await wait(600);
+      const fresh = BL.booking(b.id);
+      const declined = fresh.items.filter((i) => i.status === "declined");
+      const alts = declined.length ? BL.alternativesFor(declined[0], declined[0].guests).slice(0, 4) : [];
+      screen(`<div class="flex flex-col items-center text-center gap-3 pt-6">
+        <span class="success-ring tile" style="width:72px;height:72px;color:var(--${declined.length ? "wait" : "ok"})">${icon(declined.length ? "alert" : "check-circle", "lg")}</span>
+        <h1 style="font-size:24px">${declined.length ? "Booked, with one change" : "You’re all set"}</h1>
+        <p class="muted">${declined.length ? `${fresh.items.length - declined.length} of ${fresh.items.length} stops confirmed. ${money(declined.reduce((s, i) => s + i.price, 0))} is already on its way back to ${esc(method)}. Keep the rest, or let it all go for a full refund.` : `Every vendor confirmed. ${money(fresh.total)} charged to ${esc(method)}, ${Math.round(fresh.total / 100)} points earned.`}</p>
+        <div class="group w-full mt-3 text-left">${fresh.items.map((it) => { const o = BL.offer(it.offerId); return `<div class="row"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub">${it.time}${it.declineReason ? ` · ${esc(it.declineReason)}` : it.voucher ? ` · ${esc(it.voucher)} in your wallet` : ""}</span></span><span class="right">${BL.badge(it.status)}</span></div>`; }).join("")}</div>
+        ${alts.length ? `<section class="section w-full text-left mt-4"><div class="section-title"><h2>Available instead</h2></div><div class="group">${alts.map((o) => { const v = BL.vendor(o.vendorId); return `<a class="row press" href="offer.html?id=${o.id}"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub block truncate">${esc(v.name)} · ${esc(v.area)}</span></span><span class="right num">${money(BL.itemPrice(o, declined[0].guests))}</span>${icon("chevron-right", "sm chev")}</a>`; }).join("")}</div></section>` : ""}
+        <a class="btn btn-primary btn-lg btn-block mt-4" href="booking.html?id=${b.id}">${declined.length ? "Keep the rest" : "View booking"}</a>${declined.length ? `<button class="btn btn-ghost btn-block" id="unwind">Cancel the rest, refund everything</button>` : `<a class="btn btn-ghost btn-block" href="home.html">Home</a>`}</div>`);
+      BL.on(view, "click", "#unwind", async () => {
+        if (!(await BL.confirm({ title: "Cancel the rest?", body: "Every confirmed vendor is told and the whole amount goes back to your payment method.", ok: "Cancel everything", cancel: "Keep the rest", danger: true }))) return;
+        const r = BL.cancelBooking(b.id, true); BL.toast(`Cancelled, ${money(r.refund)} refunded`); location.href = `booking.html?id=${b.id}`;
+      });
+    }
+    function failed(reason) {
+      return `<div class="flex flex-col items-center text-center gap-3 pt-10"><span class="tile" style="width:72px;height:72px;color:var(--bad)">${icon("x-circle", "lg")}</span><h1 style="font-size:24px">Payment didn’t go through</h1><p class="muted">${esc(reason || "The bank declined it.")} The holds were released, nothing was booked and nothing was charged.</p>
+        <button class="btn btn-primary btn-lg btn-block mt-4" id="retry">Try again</button><button class="btn btn-ghost btn-block" id="change">Change payment method</button></div>`;
+    }
+    BL.on(view, "click", "#retry", () => { outcome = "success"; form(); });
+    BL.on(view, "click", "#change", () => { outcome = "success"; form(); view.querySelector("[data-method]").focus(); });
+
+    function payTix() {
+      if (outcome === "failed") { resetSwipe(); return screen(failed(method === "Wallet" ? "Wallet balance too low." : "Card declined by issuer.")); }
+      const res = BL.payTickets(t.id, method);
+      if (!res.ok) { resetSwipe(); return screen(failed(res.reason)); }
+      cta.hidden = true;
+      screen(`<div class="flex flex-col items-center text-center gap-3 pt-10"><span class="success-ring tile" style="width:72px;height:72px;color:var(--ok)">${icon("check-circle", "lg")}</span><h1 style="font-size:24px">Tickets are yours</h1><p class="muted">${BL.plural(t.qty, "ticket")} for ${esc(ev.title)}, ${fdate(ev.date)} ${ev.time}. ${amt() ? `${money(amt())} charged to ${esc(method)}.` : "No charge for a free event."}</p>
+        <a class="btn btn-primary btn-lg btn-block mt-4" href="ticket.html?id=${t.id}">Show ticket</a><a class="btn btn-ghost btn-block" href="events.html">Events</a></div>`);
+    }
+  })();
+</script>
+</body>
+</html>

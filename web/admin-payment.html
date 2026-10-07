@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Payment · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const p = BL.payment(BL.qs("id"));
+    BL.web.shell({ title: p ? `Payment ${p.id}` : "Payment", role: "admin", active: "payments" });
+    const view = document.getElementById("view");
+    if (!p) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("card")}</span><h3>No such payment</h3><a class="btn btn-primary btn-sm" href="admin-payments.html">All payments</a></div>`; return; }
+    function draw() {
+      const u = BL.user(p.userId); const b = p.kind === "tickets" ? null : BL.booking(p.bookingId); const tk = p.kind === "tickets" ? BL.ticket(p.ticketId) : null; const ev = tk && BL.event(tk.eventId);
+      const left = p.amount - (p.refundAmount || 0); const refundable = ["succeeded", "partially_refunded"].includes(p.status) && left > 0;
+      const related = state.payments.filter((x) => x.userId === p.userId && x.id !== p.id).sort((a, c) => c.at.localeCompare(a.at));
+      view.innerHTML = `
+        <div class="crumbs"><a href="admin-payments.html">Payments</a>${icon("chevron-right", "sm")}<span class="num">${p.id}</span></div>
+        <div class="page-head"><div class="min-w-0"><h1 class="num">${money(p.amount)}</h1><p>${esc(p.method)} · ${fstamp(p.at)} · ${p.kind === "tickets" ? "event tickets" : "a booking"}</p></div><div class="flex items-center gap-2 flex-wrap">${BL.badge(p.status)}${p.status === "pending" ? `<button class="btn btn-secondary" id="fail">Mark as failed</button><button class="btn btn-primary" id="settle">Mark as settled</button>` : p.status === "failed" ? `<button class="btn btn-primary" id="retry">Retry the charge</button>` : refundable ? `<button class="btn btn-primary" id="refund">Refund</button>` : ""}</div></div>
+        ${p.status === "failed" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("ban", "sm")}<p class="text-sm">The bank declined it: ${esc(p.failReason || "card declined")}. The member was asked to try another card and nothing was sent to the vendors.</p></div>` : p.status === "pending" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("clock", "sm")}<p class="text-sm">Waiting on the bank. Settling it here is what the webhook would do, and lets the vendors confirm.</p></div>` : p.refundAmount ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("undo", "sm")}<p class="text-sm">${money(p.refundAmount)} refunded${p.refundReason ? `: ${esc(p.refundReason)}` : ""}. ${left > 0 ? `${money(left)} still held.` : "Nothing left to refund."}</p></div>` : ""}
+        <div class="split">
+          <div>
+            <section class="section"><div class="section-title"><h2>Charge</h2></div><div class="card"><div class="kv"><dt>Member</dt><dd><a href="admin-user.html?id=${u.id}">${esc(u.name)}</a></dd></div><div class="kv"><dt>For</dt><dd>${b ? `<a href="admin-booking.html?id=${b.id}">${b.code} · ${esc(b.title)}</a>` : ev ? `<a href="admin-event.html?id=${ev.id}">${esc(ev.title)}</a> · ${BL.plural(tk.qty, "ticket")}` : "—"}</dd></div><div class="kv"><dt>Method</dt><dd>${esc(p.method)}</dd></div><div class="kv"><dt>Amount</dt><dd class="num">${money(p.amount)}</dd></div><div class="kv"><dt>Refunded</dt><dd class="num">${p.refundAmount ? money(p.refundAmount) : "—"}</dd></div><div class="kv"><dt>Net</dt><dd class="num">${money(p.status === "failed" ? 0 : left)}</dd></div><div class="kv"><dt>Taken</dt><dd>${fstamp(p.at)}</dd></div><div class="kv"><dt>Status</dt><dd>${BL.badge(p.status)}</dd></div></div></section>
+            ${b ? `<section class="section"><div class="section-title"><h2>What it paid for</h2><a href="admin-booking.html?id=${b.id}">Open booking</a></div><div class="panel px-4">${b.items.map((i) => `<div class="row"><span class="tile num text-sm">${i.time}</span><span class="body"><span class="title block truncate">${esc(BL.offer(i.offerId).title)}</span><span class="sub block truncate">${esc(BL.vendor(i.vendorId).name)} · ${fdate(i.date)}${i.refunded ? ` · ${money(i.refunded)} refunded` : ""}</span></span><span class="right"><span class="num text-sm">${money(i.price)}</span> ${BL.badge(i.status)}</span></div>`).join("")}</div></section>` : ""}
+          </div>
+          <div>
+            <section class="section"><div class="section-title"><h2>Other charges by ${esc(u.name.split(" ")[0])}</h2></div>${related.length ? `<div class="panel px-4">${related.slice(0, 6).map((x) => `<a class="row press" href="admin-payment.html?id=${x.id}"><span class="tile">${icon("card", "sm")}</span><span class="body"><span class="title block truncate">${money(x.amount)} · ${esc(x.method)}</span><span class="sub">${fstamp(x.at)}</span></span><span class="right">${BL.badge(x.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("card")}</span><h3>First charge</h3><p>This is the only payment on the account.</p></div>`}</section>
+          </div>
+        </div>`;
+    }
+    draw();
+    BL.on(view, "click", "#refund", () => {
+      const left = p.amount - (p.refundAmount || 0);
+      BL.dialog({ title: "Refund", body: `<form id="rf" class="flex flex-col gap-3" novalidate><div class="field"><label class="label" for="amt">Amount</label><input class="input num" id="amt" type="number" inputmode="numeric" min="1" max="${left}" step="1" value="${left}"><p class="help">Up to ${money(left)}. A full refund cancels every stop not yet redeemed.</p><p class="error">Between ₪1 and ${money(left)}.</p></div><div class="field"><label class="label" for="why">Reason</label><input class="input" id="why" placeholder="Vendor closed early" autocomplete="off"><p class="error">Give a reason; it goes on the member’s receipt.</p></div></form>`,
+        actions: [{ label: "Cancel" }, { label: "Refund", kind: "primary", onClick: (close, host) => { const amt = Number(host.querySelector("#amt").value), why = host.querySelector("#why").value.trim(); host.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); let bad = false; if (!(amt >= 1 && amt <= left)) { host.querySelector("#amt").closest(".field").classList.add("is-invalid"); bad = true; } if (!why) { host.querySelector("#why").closest(".field").classList.add("is-invalid"); bad = true; } if (bad) return; BL.adminRefund(p.id, amt, why); close(); BL.toast(`${money(amt)} refunded to ${BL.user(p.userId).name.split(" ")[0]}`); draw(); } }] });
+    });
+    BL.on(view, "click", "#settle", async () => { if (!(await BL.confirm({ title: "Mark as settled?", body: `${money(p.amount)} is treated as cleared and the vendors are asked to confirm.`, ok: "Settle" }))) return; BL.settlePending(p.id); state.log.unshift({ at: BL.nowIso(), text: `Settled ${p.id} by hand` }); BL.save(); BL.toast("Settled"); draw(); });
+    BL.on(view, "click", "#fail", () => {
+      BL.dialog({ title: "Mark as failed?", body: `<p class="text-sm muted mb-4">The member is asked to pay again and the vendors hear nothing until they do.</p><div class="field"><label class="label" for="why">Reason</label><select class="select" id="why"><option>Card declined</option><option>3-D Secure not completed</option><option>Insufficient funds</option><option>Bank timed out</option></select></div>`,
+        actions: [{ label: "Cancel" }, { label: "Mark as failed", kind: "danger", onClick: (close, host) => { p.status = "failed"; p.failReason = host.querySelector("#why").value; const b = BL.booking(p.bookingId); if (b) { b.items.forEach((i) => { if (i.status === "pending") i.status = "cancelled"; }); BL.recomputeBooking(b); } state.log.unshift({ at: BL.nowIso(), text: `${p.id} marked failed: ${p.failReason}` }); BL.save(); close(); BL.toast("Marked as failed"); draw(); } }] });
+    });
+    BL.on(view, "click", "#retry", async () => { if (!(await BL.confirm({ title: "Retry the charge?", body: `${money(p.amount)} is charged again to the same ${p.method}.`, ok: "Retry" }))) return; p.status = "pending"; p.failReason = ""; p.at = BL.nowIso(); const b = BL.booking(p.bookingId); if (b) { b.items.forEach((i) => { if (i.status === "cancelled" && !i.refunded) i.status = "pending"; }); BL.recomputeBooking(b); } state.log.unshift({ at: BL.nowIso(), text: `Retried ${p.id}` }); BL.save(); BL.toast("Charge sent again, pending at the bank"); draw(); });
+  })();
+</script>
+</body>
+</html>

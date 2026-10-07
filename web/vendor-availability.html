@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Vendor Portal">
+<title>Availability · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Availability</h1><p id="sub"></p></div><button class="btn btn-primary" id="add">Add a slot</button></div>
+  <div class="grid-stats mb-8" id="stats"></div>
+  <div class="chips mb-6" id="days" role="group" aria-label="Day"></div>
+  <div class="split">
+    <div><div id="slots"></div></div>
+    <div><div class="card"><h2 class="mb-2">How slots work</h2><p class="text-sm muted mb-3">A slot is a time the concierge can book into. Click one to close it; booked guests keep their place. Closed slots never appear to members.</p><p class="text-sm muted">Seats booked through Blissers count down automatically.</p></div></div>
+  </div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const vid = state.session.vendorId;
+    BL.web.shell({ title: "Availability", role: "vendor", active: "availability" });
+    const days = BL.daysAhead(7);
+    let date = days.includes(BL.qs("date")) ? BL.qs("date") : days[0];
+    const mine = () => state.availability.filter((s) => s.vendorId === vid);
+    const forDay = () => mine().filter((s) => s.date === date).sort((a, b) => a.time.localeCompare(b.time));
+    function draw() {
+      const week = mine().filter((s) => days.includes(s.date));
+      const open = week.filter((s) => s.open); const seats = open.reduce((x, s) => x + s.capacity, 0); const booked = open.reduce((x, s) => x + s.booked, 0);
+      document.getElementById("sub").textContent = `${BL.plural(open.length, "open slot")} in the next seven days`;
+      document.getElementById("stats").innerHTML = [["Open slots", open.length], ["Closed", week.length - open.length], ["Seats booked", booked], ["Fill rate", seats ? `${Math.round((booked / seats) * 100)}%` : "—"]].map(([l, v]) => `<div class="stat panel p-4"><span class="value">${v}</span><span class="label muted">${l}</span></div>`).join("");
+      document.getElementById("days").innerHTML = days.map((d) => { const n = mine().filter((s) => s.date === d && s.open).length; return `<button type="button" class="chip ${d === date ? "is-on" : ""}" data-date="${d}" aria-pressed="${d === date}">${fdate(d)}${n ? `<span class="muted">· ${n}</span>` : ""}</button>`; }).join("");
+      const list = forDay();
+      BL.render(document.getElementById("slots"), list.length ? `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 stagger">${list.map((s, i) => `<button type="button" class="slot ${s.open ? "" : "is-off"}" data-slot="${s.id}" aria-pressed="${s.open}" aria-label="${s.time}, ${s.open ? "open" : "closed"}" style="--i:${i}">${s.time}<small>${s.open ? (s.booked >= s.capacity ? "Full" : `${s.booked} of ${s.capacity} booked`) : "Closed"}</small></button>`).join("")}</div><p class="help mt-3">Click a slot to close or reopen it.</p>`
+        : `<div class="empty panel"><span class="tile">${icon("clock")}</span><h3>No slots on ${fdate(date, "long")}</h3><p>Members cannot book this day until you add one.</p><button class="btn btn-secondary btn-sm" id="add2">Add a slot</button></div>`);
+    }
+    draw();
+    BL.on(document.getElementById("days"), "click", "[data-date]", (e, b) => { date = b.dataset.date; history.replaceState(null, "", `vendor-availability.html?date=${date}`); draw(); });
+    BL.on(document.getElementById("slots"), "click", "[data-slot]", (e, b) => { const s = BL.toggleSlot(b.dataset.slot); BL.toast(s.open ? `${s.time} reopened` : `${s.time} closed`); draw(); });
+    function addDialog() {
+      BL.dialog({ title: `Add a slot on ${fdate(date, "long")}`, body: `<form id="sf" class="grid grid-cols-2 gap-3" novalidate><div class="field"><label class="label" for="time">Time</label><input class="input num" id="time" name="time" type="time" value="20:00" required><p class="error">Pick a time.</p></div><div class="field"><label class="label" for="cap">Seats</label><input class="input num" id="cap" name="cap" type="number" inputmode="numeric" min="1" max="60" value="6"><p class="error">1 to 60 seats.</p></div></form><p class="help mt-3">A slot is one sitting. Add one per time you can take guests.</p>`,
+        actions: [{ label: "Cancel" }, { label: "Add slot", kind: "primary", onClick: (close, host) => { const f = host.querySelector("#sf"); const t = f.time.value; const c = Number(f.cap.value); let bad = false; f.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); if (!t) { f.time.closest(".field").classList.add("is-invalid"); bad = true; } if (!(c >= 1 && c <= 60)) { f.cap.closest(".field").classList.add("is-invalid"); bad = true; } if (bad) return; if (forDay().some((s) => s.time === t)) { f.time.closest(".field").classList.add("is-invalid"); f.time.closest(".field").querySelector(".error").textContent = "There is already a slot at that time."; return; } BL.addSlot(vid, date, t, c); close(); BL.toast(`${t} added`); draw(); } }] });
+    }
+    document.getElementById("add").addEventListener("click", addDialog);
+    BL.on(document.getElementById("slots"), "click", "#add2", addDialog);
+  })();
+</script>
+</body>
+</html>

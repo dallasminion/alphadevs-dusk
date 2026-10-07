@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>User · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const u = BL.user(BL.qs("id"));
+    BL.web.shell({ title: u ? u.name : "User", role: "admin", active: "users" });
+    const view = document.getElementById("view");
+    if (!u) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("user")}</span><h3>No such user</h3><a class="btn btn-primary btn-sm" href="admin-users.html">All users</a></div>`; return; }
+    function draw() {
+      const st = BL.userStats(u.id); const tickets = state.tickets.filter((t) => t.userId === u.id);
+      const threads = state.supportThreads.filter((s) => s.userId === u.id).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const pays = state.payments.filter((p) => p.userId === u.id).sort((a, b) => b.at.localeCompare(a.at));
+      const v = u.vendorId && BL.vendor(u.vendorId);
+      view.innerHTML = `
+        <div class="crumbs"><a href="admin-users.html">Users</a>${icon("chevron-right", "sm")}<span>${esc(u.name)}</span></div>
+        <div class="page-head"><div class="flex items-center gap-3 min-w-0"><span class="avatar lg">${BL.initials(u.name)}</span><div class="min-w-0"><h1 class="truncate">${esc(u.name)}</h1><p>${u.role === "member" ? `${esc(u.plan)} member` : u.role === "vendor" ? "Vendor account" : "Admin"} · joined ${fdate(u.joined, "long")}</p></div></div><div class="flex gap-2 items-center">${BL.badge(u.status)}<button class="btn btn-secondary" id="edit">Edit</button>${u.status === "suspended" ? `<button class="btn btn-primary" id="react">Reactivate</button>` : u.id !== BL.me() ? `<button class="btn btn-secondary" id="susp">Suspend</button>` : ""}</div></div>
+        ${u.status === "suspended" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("ban", "sm")}<p class="text-sm">Suspended${u.statusReason ? `: ${esc(u.statusReason)}` : ""}. They cannot sign in or book until reactivated.</p></div>` : u.status === "invited" ? `<div class="panel p-4 mb-6 flex flex-wrap gap-3 items-center">${icon("mail", "sm")}<p class="text-sm flex-1">Invited, not yet signed in.</p><button class="btn btn-secondary btn-sm" id="resend">Resend invite</button></div>` : ""}
+        <div class="split">
+          <div>
+            <div class="grid-stats mb-6"><div class="stat panel p-4"><span class="value">${st.bookings}</span><span class="label muted">Bookings</span></div><div class="stat panel p-4"><span class="value">${money(st.spent)}</span><span class="label muted">Spent</span></div><div class="stat panel p-4"><span class="value">${tickets.reduce((s, t) => s + (t.status === "paid" || t.status === "checked_in" ? t.qty : 0), 0)}</span><span class="label muted">Event tickets</span></div><div class="stat panel p-4"><span class="value">${threads.length}</span><span class="label muted">Support threads</span></div></div>
+            <section class="section"><div class="section-title"><h2>Bookings</h2></div><div id="bk"></div></section>
+          </div>
+          <div>
+            <section class="section"><div class="section-title"><h2>Details</h2></div>
+              <div class="card"><div class="kv"><dt>Email</dt><dd><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></dd></div><div class="kv"><dt>Phone</dt><dd>${esc(u.phone || "—")}</dd></div><div class="kv"><dt>City</dt><dd>${esc(u.city || "—")}</dd></div><div class="kv"><dt>Role</dt><dd>${u.role === "member" ? "Member" : u.role === "vendor" ? "Vendor" : "Admin"}</dd></div>${v ? `<div class="kv"><dt>Runs</dt><dd><a href="admin-vendor.html?id=${v.id}">${esc(v.name)}</a></dd></div>` : ""}${u.role === "member" ? `<div class="kv"><dt>Plan</dt><dd>${esc(u.plan)}</dd></div>` : ""}<div class="kv"><dt>Joined</dt><dd>${fdate(u.joined, "long")}</dd></div></div>
+            </section>
+            <section class="section"><div class="section-title"><h2>Payments</h2></div>
+              ${pays.length ? `<div class="panel px-4">${pays.slice(0, 6).map((p) => `<a class="row press" href="admin-payment.html?id=${p.id}"><span class="tile">${icon("card", "sm")}</span><span class="body"><span class="title block truncate">${money(p.amount)} · ${esc(p.method)}</span><span class="sub block truncate">${p.kind === "tickets" ? "Tickets" : (BL.booking(p.bookingId) || {}).code || "Booking"} · ${fstamp(p.at)}</span></span><span class="right">${BL.badge(p.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("card")}</span><h3>No payments</h3><p>Nothing has been charged to this account.</p></div>`}
+            </section>
+            <section class="section"><div class="section-title"><h2>Support</h2></div>
+              ${threads.length ? `<div class="panel px-4">${threads.map((s) => `<a class="row press" href="../ios/support-chat.html?id=${s.id}"><span class="tile">${icon("headset", "sm")}</span><span class="body"><span class="title block truncate">${esc(s.subject)}</span><span class="sub">${fstamp(s.updatedAt)}</span></span><span class="right">${BL.badge(s.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("headset")}</span><h3>No support threads</h3><p>They have never needed to ask for help.</p></div>`}
+            </section>
+          </div>
+        </div>`;
+      BL.webTable(document.getElementById("bk"), { rows: state.bookings.filter((b) => b.userId === u.id), sort: "createdAt", dir: "desc", href: (b) => `admin-booking.html?id=${b.id}`, pageSize: 6,
+        cols: [{ key: "code", label: "Code", render: (b) => `<span class="num">${b.code}</span>` }, { key: "title", label: "Plan", render: (b) => `<span class="truncate">${esc(b.title)}</span>` }, { key: "createdAt", label: "Booked", render: (b) => fdate(b.createdAt.slice(0, 10), "short") }, { key: "total", label: "Total", num: true, render: (b) => money(b.total) }, { key: "status", label: "Status", render: (b) => BL.badge(b.status) }],
+        card: (b) => ({ title: `${b.code} · ${esc(b.title)}`, meta: `${fdate(b.createdAt.slice(0, 10), "short")} · ${money(b.total)}`, right: BL.badge(b.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>No bookings yet</h3><p>Plans they pay for appear here.</p></div>` });
+    }
+    draw();
+    BL.on(view, "click", "#edit", () => {
+      BL.dialog({ title: "Edit user", body: `<form id="uf" class="grid grid-cols-1 md:grid-cols-2 gap-3" novalidate><div class="field md:col-span-2"><label class="label" for="nm">Name</label><input class="input" id="nm" name="name" value="${esc(u.name)}"><p class="error">A name is needed.</p></div><div class="field"><label class="label" for="em">Email</label><input class="input" id="em" name="email" type="email" inputmode="email" value="${esc(u.email)}"><p class="error">Enter an email address.</p></div><div class="field"><label class="label" for="ph">Phone</label><input class="input num" id="ph" name="phone" type="tel" inputmode="tel" value="${esc(u.phone || "")}"></div><div class="field"><label class="label" for="ct">City</label><input class="input" id="ct" name="city" value="${esc(u.city || "")}"></div>${u.role === "member" ? `<div class="field"><label class="label" for="pl">Plan</label><select class="select" id="pl" name="plan">${["Standard", "Plus", "Black"].map((p) => `<option ${p === u.plan ? "selected" : ""}>${p}</option>`).join("")}</select></div>` : ""}</form>`,
+        actions: [{ label: "Cancel" }, { label: "Save", kind: "primary", onClick: (close, host) => { const f = host.querySelector("#uf"); let bad = false; f.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid")); if (!f.name.value.trim()) { f.name.closest(".field").classList.add("is-invalid"); bad = true; } if (!/^\S+@\S+\.\S+$/.test(f.email.value.trim())) { f.email.closest(".field").classList.add("is-invalid"); bad = true; } if (bad) return; BL.saveUser({ id: u.id, name: f.name.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim(), city: f.city.value.trim(), ...(f.plan ? { plan: f.plan.value } : {}) }); close(); BL.toast("Saved"); draw(); } }] });
+    });
+    BL.on(view, "click", "#susp", () => {
+      BL.dialog({ title: `Suspend ${esc(u.name)}?`, body: `<p class="text-sm muted mb-4">They are signed out everywhere and cannot book until you reactivate them. Live bookings stay as they are.</p><div class="field"><label class="label" for="why">Reason</label><input class="input" id="why" placeholder="Chargeback on two bookings" autocomplete="off"><p class="error">Give a reason; it is shown on this page.</p></div>`,
+        actions: [{ label: "Keep active" }, { label: "Suspend", kind: "danger", onClick: (close, host) => { const r = host.querySelector("#why").value.trim(); if (!r) { host.querySelector(".field").classList.add("is-invalid"); return; } BL.setUserStatus(u.id, "suspended", r); close(); BL.toast("Suspended"); draw(); } }] });
+    });
+    BL.on(view, "click", "#react", async () => { if (!(await BL.confirm({ title: `Reactivate ${u.name}?`, body: "They can sign in and book again straight away.", ok: "Reactivate" }))) return; BL.setUserStatus(u.id, "active", ""); BL.toast("Reactivated"); draw(); });
+    BL.on(view, "click", "#resend", () => BL.toast(`Invite sent again to ${u.email}`));
+  })();
+</script>
+</body>
+</html>

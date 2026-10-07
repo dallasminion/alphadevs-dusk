@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Offer · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const isNew = BL.qs("new") === "1";
+    const o = isNew ? { title: "", vendorId: BL.qs("vendor") || state.vendors.find((v) => v.status === "active").id, price: 0, unit: "per person", duration: 90, status: "draft", tags: [], description: "" } : BL.offer(BL.qs("id"));
+    BL.web.shell({ title: isNew ? "New offer" : o ? o.title : "Offer", role: "admin", active: "catalog" });
+    const view = document.getElementById("view");
+    if (!o) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("tag")}</span><h3>No such offer</h3><a class="btn btn-primary btn-sm" href="admin-catalog.html">Catalogue</a></div>`; return; }
+    const uses = isNew ? [] : state.bookings.filter((b) => b.items.some((i) => i.offerId === o.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const revenue = uses.reduce((s, b) => s + b.items.filter((i) => i.offerId === o.id && ["confirmed", "redeemed", "pending"].includes(i.status)).reduce((x, i) => x + i.price, 0), 0);
+    const v = BL.vendor(o.vendorId);
+    view.innerHTML = `
+      <div class="crumbs"><a href="admin-catalog.html">Catalogue</a>${icon("chevron-right", "sm")}<span>${isNew ? "New offer" : esc(o.title)}</span></div>
+      <div class="page-head"><div class="min-w-0"><h1 class="truncate">${isNew ? "New offer" : esc(o.title)}</h1><p>${isNew ? "Something the concierge can put in a plan" : `${esc(v.name)} · ${esc(v.category)}`}</p></div>${isNew ? "" : `<div class="flex items-center gap-2">${BL.badge(o.status)}<a class="btn btn-secondary" href="../ios/offer.html?id=${o.id}">Member view</a></div>`}</div>
+      <div class="split">
+        <div>
+          <form class="card" id="of" novalidate>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="field md:col-span-2"><label class="label" for="title">Title</label><input class="input" id="title" name="title" value="${esc(o.title)}" placeholder="Chef’s counter tasting" autocomplete="off"><p class="error">Give the offer a title.</p></div>
+              <div class="field md:col-span-2"><label class="label" for="vendor">Vendor</label><select class="select" id="vendor" name="vendorId">${state.vendors.filter((x) => x.status !== "suspended" || x.id === o.vendorId).map((x) => `<option value="${x.id}" ${x.id === o.vendorId ? "selected" : ""}>${esc(x.name)}${x.status === "pending" ? " (awaiting review)" : ""}</option>`).join("")}</select></div>
+              <div class="field"><label class="label" for="price">Price</label><input class="input num" id="price" name="price" type="number" inputmode="numeric" min="0" step="1" value="${o.price}"><p class="error">A price of 0 or more.</p></div>
+              <div class="field"><label class="label" for="unit">Charged</label><select class="select" id="unit" name="unit">${["per person", "per table", "per session", "per night", "per group"].map((u) => `<option ${u === o.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
+              <div class="field"><label class="label" for="duration">Length in minutes</label><input class="input num" id="duration" name="duration" type="number" inputmode="numeric" min="15" step="15" value="${o.duration}"><p class="error">At least 15 minutes.</p></div>
+              <div class="field"><label class="label" for="status">Status</label><select class="select" id="status" name="status">${[["draft", "Draft"], ["active", "Active"], ["paused", "Paused"]].map(([k, l]) => `<option value="${k}" ${k === o.status ? "selected" : ""}>${l}</option>`).join("")}</select><p class="help">Only active offers go into plans.</p></div>
+              <div class="field md:col-span-2"><label class="label" for="tags">Tags</label><input class="input" id="tags" name="tags" value="${esc(o.tags.join(", "))}" placeholder="date night, tasting, vegetarian" autocomplete="off"><p class="help">Comma separated. The concierge matches a request on these.</p></div>
+              <div class="field md:col-span-2"><label class="label" for="description">Description</label><textarea class="textarea" id="description" name="description" rows="4">${esc(o.description)}</textarea></div>
+            </div>
+            <div class="flex gap-2 justify-end mt-6"><a class="btn btn-secondary" href="admin-catalog.html">Cancel</a>${isNew ? "" : `<button type="button" class="btn btn-secondary" id="dup">Duplicate</button>`}<button type="submit" class="btn btn-primary">${isNew ? "Create offer" : "Save changes"}</button></div>
+          </form>
+        </div>
+        <div>
+          ${isNew ? `<div class="card"><h2 class="text-base font-medium mb-2">What happens next</h2><p class="text-sm muted">A draft is invisible to members. Set it active and the concierge starts suggesting it the next time a request matches its tags.</p></div>` : `
+          <div class="grid-stats mb-6" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div class="stat panel p-4"><span class="value">${uses.length}</span><span class="label muted">Bookings</span></div><div class="stat panel p-4"><span class="value">${money(revenue)}</span><span class="label muted">Booked value</span></div></div>
+          <section class="section"><div class="section-title"><h2>Booked by</h2></div>
+            ${uses.length ? `<div class="panel px-4">${uses.slice(0, 8).map((b) => { const it = b.items.find((i) => i.offerId === o.id); return `<a class="row press" href="admin-booking.html?id=${b.id}"><span class="tile num text-sm">${it.time}</span><span class="body"><span class="title block truncate">${esc(BL.user(b.userId).name)} · ${b.code}</span><span class="sub">${fdate(it.date)} · ${BL.plural(it.guests, "guest")}</span></span><span class="right">${BL.badge(it.status)}</span></a>`; }).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>Never booked</h3><p>No plan has included this offer yet.</p></div>`}
+          </section>
+          <section class="section"><div class="section-title"><h2>Vendor</h2></div><div class="card"><div class="kv"><dt>Name</dt><dd><a href="admin-vendor.html?id=${v.id}">${esc(v.name)}</a></dd></div><div class="kv"><dt>Area</dt><dd>${esc(v.area)}</dd></div><div class="kv"><dt>Status</dt><dd>${BL.badge(v.status)}</dd></div><div class="kv"><dt>Commission</dt><dd>${v.commission}%</dd></div></div></section>`}
+        </div>
+      </div>`;
+    const form = document.getElementById("of");
+    function read() {
+      let bad = false; form.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid"));
+      const mark = (name) => { form[name].closest(".field").classList.add("is-invalid"); bad = true; };
+      if (!form.title.value.trim()) mark("title"); if (!(Number(form.price.value) >= 0)) mark("price"); if (!(Number(form.duration.value) >= 15)) mark("duration");
+      if (bad) { form.querySelector(".is-invalid input, .is-invalid select").focus(); return null; }
+      return { title: form.title.value.trim(), vendorId: form.vendorId.value, price: Number(form.price.value), unit: form.unit.value, duration: Number(form.duration.value), status: form.status.value, tags: form.tags.value.split(",").map((s) => s.trim()).filter(Boolean), description: form.description.value.trim() };
+    }
+    form.addEventListener("submit", (e) => {
+      e.preventDefault(); const patch = read(); if (!patch) return;
+      const saved = BL.saveOffer(isNew ? patch : { id: o.id, ...patch });
+      state.log.unshift({ at: BL.nowIso(), text: `${isNew ? "Added" : "Edited"} offer “${saved.title}”` }); BL.save();
+      BL.toast(isNew ? "Offer created" : "Saved"); location.href = isNew ? `admin-offer.html?id=${saved.id}` : "admin-catalog.html";
+    });
+    BL.on(view, "click", "#dup", () => { const patch = read(); if (!patch) return; const c = BL.saveOffer({ ...patch, title: `${patch.title} (copy)`, status: "draft" }); BL.toast("Duplicated as a draft"); location.href = `admin-offer.html?id=${c.id}`; });
+  })();
+</script>
+</body>
+</html>

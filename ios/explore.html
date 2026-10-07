@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Home / Explore">
+<title>Explore · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <h1 class="large-title">Explore</h1>
+  <form class="input-wrap mb-4" id="search" role="search">
+    <svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input class="input" type="search" name="q" placeholder="Search places, offers, events" aria-label="Search" autocomplete="off" enterkeyhint="search">
+  </form>
+  <div class="hscroll mb-4" id="cats" role="group" aria-label="Category"></div>
+  <div class="seg mb-5" id="view" role="group" aria-label="Show">
+    <button data-view="offers" aria-pressed="true">Offers</button>
+    <button data-view="vendors" aria-pressed="false">Places</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, state } = BL;
+    BL.ios.shell({ title: "Explore", back: "home.html", tab: "home", large: true });
+    const q = (BL.qs("q") || "").trim().toLowerCase();
+    const cat = BL.qs("cat") || "";
+    let view = BL.qs("view") === "vendors" ? "vendors" : "offers";
+    document.querySelector("#search input").value = BL.qs("q") || "";
+
+    const url = (patch) => { const u = new URLSearchParams(location.search); Object.entries(patch).forEach(([k, v]) => v ? u.set(k, v) : u.delete(k)); const s = u.toString(); return `explore.html${s ? "?" + s : ""}`; };
+    document.getElementById("cats").innerHTML = [`<a class="chip ${!cat ? "is-on" : ""}" href="${url({ cat: "" })}" style="flex:none">All</a>`]
+      .concat(state.categories.map((c) => `<a class="chip ${c.id === cat ? "is-on" : ""}" href="${url({ cat: c.id })}" style="flex:none">${icon(c.icon, "sm")}${esc(c.id)}</a>`)).join("");
+
+    const activeVendor = (v) => v && v.status === "active";
+    const match = (hay) => !q || hay.toLowerCase().includes(q);
+    const offers = state.offers.filter((o) => { const v = BL.vendor(o.vendorId); return o.status === "active" && activeVendor(v) && (!cat || v.category === cat) && match(`${o.title} ${v.name} ${v.area} ${(o.tags || []).join(" ")} ${o.description}`); });
+    const vendors = state.vendors.filter((v) => activeVendor(v) && (!cat || v.category === cat) && match(`${v.name} ${v.area} ${v.category} ${v.description}`));
+
+    const ocard = (o) => { const v = BL.vendor(o.vendorId); return `<a class="ocard" href="offer.html?id=${o.id}"><span class="art">${icon(BL.categoryIcon(v.category), "lg")}</span><span class="name">${esc(o.title)}</span><span class="meta">${esc(v.name)} · ${esc(v.area)}</span><span class="foot"><span>${money(o.price)}</span><span class="muted">${esc(o.unit)}</span></span></a>`; };
+    const vrow = (v) => `<a class="row press" href="vendor.html?id=${v.id}"><span class="tile">${icon(BL.categoryIcon(v.category))}</span><span class="body"><span class="title block truncate">${esc(v.name)}</span><span class="sub block truncate">${esc(v.category)} · ${esc(v.area)} · ${BL.vendorRating(v)}</span></span><span class="right">${BL.priceLevel(v.priceLevel)}</span>${icon("chevron-right", "sm chev")}</a>`;
+    const empty = (what) => `<div class="empty"><span class="tile">${icon("search")}</span><h3>No ${what} match</h3><p>${q ? `Nothing for “${esc(q)}”${cat ? ` in ${esc(cat)}` : ""}. Try a shorter word.` : "Nothing in this category yet."}</p><a class="btn btn-secondary btn-sm" href="explore.html">Clear filters</a></div>`;
+
+    function draw() {
+      document.querySelectorAll("#view button").forEach((b) => { const on = b.dataset.view === view; b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", String(on)); });
+      const list = document.getElementById("list");
+      if (view === "offers") BL.render(list, offers.length ? `<p class="muted text-sm mb-3">${BL.plural(offers.length, "offer")}</p><div class="grid grid-cols-2 gap-3 stagger">${offers.map(ocard).join("")}</div>` : empty("offers"));
+      else BL.render(list, vendors.length ? `<p class="muted text-sm mb-3">${BL.plural(vendors.length, "place")}</p><div class="group stagger">${vendors.map(vrow).join("")}</div>` : empty("places"));
+      const grid = list.querySelector(".stagger"); if (grid) Array.from(grid.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+    }
+    draw();
+    BL.on(document.getElementById("view"), "click", "[data-view]", (e, b) => { view = b.dataset.view; history.replaceState(null, "", url({ view: view === "vendors" ? "vendors" : "" })); draw(); });
+    document.getElementById("search").addEventListener("submit", (e) => { e.preventDefault(); location.href = url({ q: e.target.q.value.trim() }); });
+  })();
+</script>
+</body>
+</html>

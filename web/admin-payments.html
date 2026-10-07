@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Payments · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Payments</h1><p id="sub"></p></div></div>
+  <div class="grid-stats mb-6" id="stats"></div>
+  <div class="toolbar">
+    <select class="select" id="status" aria-label="Status"><option value="">Every status</option><option value="succeeded">Paid</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="partially_refunded">Partly refunded</option><option value="refunded">Refunded</option></select>
+    <select class="select" id="kind" aria-label="Kind"><option value="">Bookings and tickets</option><option value="booking">Bookings</option><option value="tickets">Tickets</option></select>
+    <select class="select" id="method" aria-label="Method"><option value="">Any method</option></select>
+    <div class="input-wrap ml-auto" id="qwrap"></div>
+  </div>
+  <div id="table"></div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    BL.web.shell({ title: "Payments", role: "admin", active: "payments", onSearch: (s) => { q.value = s; redraw(); } });
+    document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Payment, booking code or member" aria-label="Filter payments" autocomplete="off">`;
+    const q = document.getElementById("q"), status = document.getElementById("status"), kind = document.getElementById("kind"), method = document.getElementById("method");
+    method.innerHTML += [...new Set(state.payments.map((p) => p.method))].map((m) => `<option>${esc(m)}</option>`).join("");
+    if (BL.qs("status")) status.value = BL.qs("status");
+    const ref = (p) => p.kind === "tickets" ? (BL.ticket(p.ticketId) ? `Tickets · ${esc(BL.event(BL.ticket(p.ticketId).eventId).title)}` : "Tickets") : ((BL.booking(p.bookingId) || {}).code || "Booking");
+    const rows = () => { const s = q.value.trim().toLowerCase(); return state.payments.filter((p) => (!status.value || p.status === status.value) && (!kind.value || p.kind === kind.value) && (!method.value || p.method === method.value) && (!s || `${p.id} ${ref(p)} ${BL.user(p.userId).name}`.toLowerCase().includes(s))); };
+    const taken = state.payments.filter((p) => ["succeeded", "partially_refunded", "refunded"].includes(p.status)).reduce((s, p) => s + p.amount, 0);
+    const refunded = state.payments.reduce((s, p) => s + (p.refundAmount || 0), 0);
+    const pending = state.payments.filter((p) => p.status === "pending"); const failed = state.payments.filter((p) => p.status === "failed");
+    document.getElementById("stats").innerHTML = `<div class="stat panel p-4"><span class="value" id="taken">${money(0)}</span><span class="label muted">Taken</span></div><div class="stat panel p-4"><span class="value">${money(refunded)}</span><span class="label muted">Refunded</span></div><a class="stat panel p-4 pressable" href="admin-payments.html?status=pending"><span class="value">${pending.length}</span><span class="label muted">Pending at the bank</span></a><a class="stat panel p-4 pressable" href="admin-payments.html?status=failed"><span class="value">${failed.length}</span><span class="label muted">Failed</span></a>`;
+    BL.countUp(document.getElementById("taken"), taken, money);
+    document.getElementById("sub").textContent = `${BL.plural(state.payments.length, "charge")} · net ${money(taken - refunded)}`;
+    const t = BL.webTable(document.getElementById("table"), { rows, sort: "at", dir: "desc", href: (p) => `admin-payment.html?id=${p.id}`, pageSize: 12,
+      cols: [{ key: "id", label: "Payment", render: (p) => `<span class="num">${p.id}</span>` }, { key: "member", label: "Member", sort: (p) => BL.user(p.userId).name, render: (p) => `<span class="truncate">${esc(BL.user(p.userId).name)}</span>` }, { key: "for", label: "For", sort: ref, render: (p) => `<span class="truncate">${ref(p)}</span>` }, { key: "method", label: "Method", render: (p) => esc(p.method) }, { key: "amount", label: "Amount", num: true, render: (p) => money(p.amount) }, { key: "refundAmount", label: "Refunded", num: true, render: (p) => p.refundAmount ? money(p.refundAmount) : `<span class="muted">—</span>` }, { key: "at", label: "When", render: (p) => fstamp(p.at) }, { key: "status", label: "Status", render: (p) => BL.badge(p.status) }],
+      card: (p) => ({ title: `${money(p.amount)} · ${esc(BL.user(p.userId).name)}`, meta: `${ref(p)} · ${esc(p.method)} · ${fstamp(p.at)}`, right: BL.badge(p.status) }),
+      empty: `<div class="empty panel"><span class="tile">${icon("card")}</span><h3>No payments match</h3><p>Clear a filter to see the rest.</p><button class="btn btn-secondary btn-sm" id="clear">Clear filters</button></div>` });
+    const redraw = () => { t.state.page = 0; t.draw(); };
+    [status, kind, method].forEach((el) => el.addEventListener("change", redraw)); q.addEventListener("input", redraw);
+    BL.on(document.getElementById("table"), "click", "#clear", () => { status.value = ""; kind.value = ""; method.value = ""; q.value = ""; history.replaceState(null, "", location.pathname); redraw(); });
+  })();
+</script>
+</body>
+</html>

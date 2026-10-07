@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Support & Feedback">
+<title>Support · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content"><div id="view"></div></main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, fstamp, state } = BL;
+    BL.ios.shell({ title: "Support", back: "profile.html", backLabel: "Profile", tab: "profile" });
+    const view = document.getElementById("view");
+    const FAQ = [
+      ["How refunds work", "A stop a vendor can’t honour is refunded to your payment method the moment they decline. Cancelling more than 24 hours before the first stop refunds everything. Inside 24 hours nothing is refunded, but support can ask the vendor."],
+      ["Moving a booking", "Message support from the booking. The concierge asks the vendor for the new time and shifts the stops after it if you want."],
+      ["Where my code is", "Every booking has one code, shown from the booking screen. Vendors scan or type it at the door. Tickets have their own code on the ticket."],
+      ["Points and the wallet", "Every ₪100 you spend earns a point. Rating a booking earns 50. Ten points are worth ₪1 on your next plan. The wallet is topped up from a card and can pay for anything."],
+    ];
+    function draw() {
+      const threads = state.supportThreads.filter((s) => s.userId === BL.me()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      view.innerHTML = `
+        <h1 class="large-title">Support</h1>
+        <a class="btn btn-primary btn-block mb-7" href="support-chat.html?new=1">${icon("chat", "sm")}New request</a>
+        <section class="section">
+          <div class="section-title"><h2>Your requests</h2></div>
+          ${threads.length ? `<div class="group stagger">${threads.map((s, i) => { const last = s.messages[s.messages.length - 1]; return `<a class="row press" href="support-chat.html?id=${s.id}" style="--i:${Math.min(i, 14)}"><span class="tile">${icon(s.status === "handed_off" ? "headset" : "chat")}</span><span class="body"><span class="title block truncate">${esc(s.subject)}</span><span class="sub block truncate">${esc(last.text)}</span><span class="sub block">${fstamp(s.updatedAt)}</span></span><span class="right">${BL.badge(s.status)}</span>${icon("chevron-right", "sm chev")}</a>`; }).join("")}</div>`
+            : `<div class="empty"><span class="tile">${icon("chat")}</span><h3>No requests yet</h3><p>Ask about a booking, a refund or anything else. The concierge answers in seconds.</p></div>`}
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Common questions</h2></div>
+          <div class="group">${FAQ.map(([q], i) => `<button class="row press" data-faq="${i}">${icon("help", "sm")}<span class="body"><span class="title">${esc(q)}</span></span>${icon("chevron-right", "sm chev")}</button>`).join("")}</div>
+        </section>
+        <section class="section">
+          <div class="group">
+            <a class="row press" href="feedback.html">${icon("star", "sm")}<span class="body"><span class="title">Rate a booking</span><span class="sub">50 points for every rating</span></span>${icon("chevron-right", "sm chev")}</a>
+            <a class="row press" href="tel:+97235550100">${icon("phone", "sm")}<span class="body"><span class="title">Call us</span><span class="sub">03-555-0100, every day 09:00–23:00</span></span></a>
+          </div>
+        </section>`;
+    }
+    draw();
+    BL.on(view, "click", "[data-faq]", (e, b) => { const [q, a] = FAQ[Number(b.dataset.faq)]; BL.sheet({ title: q, body: `<p class="text-[15px] leading-relaxed">${esc(a)}</p>`, actions: [{ label: "Still need help", kind: "secondary", onClick: () => { location.href = `support-chat.html?new=1&subject=${encodeURIComponent(q)}`; } }, { label: "Got it", kind: "primary", onClick: (c) => c() }] }); });
+  })();
+</script>
+</body>
+</html>

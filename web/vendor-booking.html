@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Vendor Portal">
+<title>Booking · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const vid = state.session.vendorId; const v = BL.vendor(vid);
+    const b = BL.booking(BL.qs("id"));
+    BL.web.shell({ title: b ? `Booking ${b.code}` : "Booking", role: "vendor", active: "bookings" });
+    const view = document.getElementById("view");
+    if (!b || !b.items.some((i) => i.vendorId === vid)) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>Not one of yours</h3><p>This booking has no stop at ${esc(v.name)}.</p><a class="btn btn-primary btn-sm" href="vendor-bookings.html">Your bookings</a></div>`; return; }
+    const toneOf = (s) => s === "confirmed" || s === "redeemed" ? "ok" : s === "pending" ? "wait" : "bad";
+    function draw() {
+      const u = BL.user(b.userId); const pay = BL.payment(b.paymentId);
+      const mine = b.items.map((it, idx) => ({ it, idx })).filter((x) => x.it.vendorId === vid).sort((a, c) => (a.it.date + a.it.time).localeCompare(c.it.date + c.it.time));
+      const others = b.items.filter((i) => i.vendorId !== vid);
+      const pendingPay = pay && pay.status === "pending";
+      const status = mine.some((x) => x.it.status === "pending") ? "pending" : mine.every((x) => x.it.status === "redeemed") ? "redeemed" : mine.every((x) => ["declined", "cancelled"].includes(x.it.status)) ? mine[0].it.status : "confirmed";
+      view.innerHTML = `
+        <div class="crumbs"><a href="vendor-bookings.html">Bookings</a>${icon("chevron-right", "sm")}<span>${b.code}</span></div>
+        <div class="page-head"><div><h1>${esc(u ? u.name : "Guest")}</h1><p>${b.code} · ${b.source === "concierge" ? "Sent by the concierge" : "Booked directly"} · ${fstamp(b.createdAt)}${others.length ? ` · part of a ${BL.plural(b.items.length, "stop")} plan` : ""}</p></div>${BL.badge(status)}</div>
+        ${pendingPay ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("clock", "sm")}<p class="text-sm">The guest's payment is still clearing. You can answer now; Blissers only releases the booking once it has cleared.</p></div>` : ""}
+        <div class="split">
+          <div>
+            <section class="section"><div class="section-title"><h2>At ${esc(v.name)}</h2></div>
+              <div class="card"><div class="timeline stagger">${mine.map(({ it, idx }, i) => { const o = BL.offer(it.offerId); return `<div class="stop ${toneOf(it.status)}" style="--i:${i}"><div class="flex items-start justify-between gap-3"><div class="min-w-0 flex-1"><p class="muted text-sm num">${fdate(it.date, "long")} · ${it.time}${o.duration ? ` · ${o.duration} min` : ""}</p><p class="font-medium truncate">${esc(o.title)}</p><p class="muted text-sm">${BL.plural(it.guests, "guest")} · ${esc(o.unit)}</p>${it.declineReason ? `<p class="text-sm mt-1" style="color:var(--bad)">Declined: ${esc(it.declineReason)}</p>` : ""}${it.status === "redeemed" ? `<p class="text-sm mt-1 muted">Redeemed ${fstamp(it.redeemedAt)}</p>` : ""}${it.editedBy ? `<p class="text-sm mt-1 muted">Adjusted by Blissers</p>` : ""}${it.status === "pending" ? `<div class="flex gap-2 mt-3"><button class="btn btn-primary btn-sm" data-ok="${o.id}">Confirm</button><button class="btn btn-secondary btn-sm" data-no="${o.id}">Decline</button></div>` : ""}</div><div class="flex flex-col items-end gap-1" style="flex:none"><span class="num">${money(it.price)}</span>${BL.badge(it.status)}</div></div></div>`; }).join("")}</div></div>
+            </section>
+            ${others.length ? `<section class="section"><div class="section-title"><h2>The rest of their plan</h2></div><div class="panel px-4">${others.map((it) => { const o = BL.offer(it.offerId); const ov = BL.vendor(it.vendorId); return `<div class="row"><span class="tile num text-sm">${it.time}</span><span class="body"><span class="title block truncate">${esc(ov.name)}</span><span class="sub block truncate">${esc(o.title)} · ${fdate(it.date)}</span></span><span class="right">${BL.badge(it.status)}</span></div>`; }).join("")}</div><p class="help mt-2">Shown so you can time the table. The other vendors handle their own stops.</p></section>` : ""}
+          </div>
+          <div>
+            <section class="section"><div class="section-title"><h2>Guest</h2></div>
+              <div class="card">${u ? `<div class="flex items-center gap-3 mb-3"><span class="avatar">${BL.initials(u.name)}</span><div class="min-w-0"><p class="font-medium truncate">${esc(u.name)}</p><p class="muted text-sm">${esc(u.plan)} member · ${esc(u.city)}</p></div></div><div class="kv"><dt>Phone</dt><dd><a href="tel:${esc(u.phone.replace(/\s/g, ""))}">${esc(u.phone)}</a></dd></div><div class="kv"><dt>Email</dt><dd><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></dd></div>` : `<p class="muted text-sm">Guest details are held by Blissers.</p>`}<div class="kv"><dt>Payment</dt><dd>${pay ? BL.badge(pay.status) : "—"}</dd></div></div>
+            </section>
+            <section class="section"><div class="section-title"><h2>At the door</h2></div>
+              <div class="card flex flex-col gap-2">
+                ${mine.some((x) => x.it.status === "confirmed") ? `<a class="btn btn-primary btn-block" href="vendor-redemption.html?code=${b.code}">${icon("qr", "sm")}Redeem ${b.code}</a>` : ""}
+                <button class="btn btn-secondary btn-block" id="msg">${icon("mail", "sm")}Message the concierge</button>
+                <p class="help">Guests show one code for the whole plan. Redeem it when they arrive and the stop is marked done.</p>
+              </div>
+            </section>
+          </div>
+        </div>`;
+    }
+    draw();
+    BL.on(view, "click", "[data-ok]", (e, btn) => { BL.vendorDecide(b.id, btn.dataset.ok, "confirm"); BL.toast("Confirmed. The guest has been told."); draw(); });
+    BL.on(view, "click", "[data-no]", (e, btn) => {
+      BL.dialog({ title: "Decline this stop?", body: `<p class="text-sm muted mb-4">The guest is refunded for this stop straight away and offered somewhere else instead.</p><div class="field"><label class="label" for="why">Reason</label><select class="select" id="why"><option>No availability at that time</option><option>Fully booked for a private event</option><option>Closed that day</option><option>Group too large</option></select></div>`,
+        actions: [{ label: "Keep it" }, { label: "Decline and refund", kind: "danger", onClick: (close, host) => { BL.vendorDecide(b.id, btn.dataset.no, "decline", host.querySelector("#why").value); close(); BL.toast("Declined. The guest is refunded."); draw(); } }] });
+    });
+    BL.on(view, "click", "#msg", () => {
+      BL.dialog({ title: "Message the concierge", body: `<div class="field"><label class="label" for="txt">About ${b.code}</label><textarea class="textarea" id="txt" rows="4" placeholder="A note about this booking…"></textarea></div>`,
+        actions: [{ label: "Cancel" }, { label: "Send", kind: "primary", onClick: (close, host) => { if (!host.querySelector("#txt").value.trim()) { host.querySelector(".field").classList.add("is-invalid"); return; } close(); BL.toast("Sent to the concierge team"); } }] });
+    });
+  })();
+</script>
+</body>
+</html>

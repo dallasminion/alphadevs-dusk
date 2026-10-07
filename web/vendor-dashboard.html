@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Vendor Portal">
+<title>Dashboard · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const v = BL.vendor(state.session.vendorId);
+    BL.web.shell({ title: v.name, role: "vendor", active: "dashboard" });
+    const view = document.getElementById("view");
+    const today = BL.day(0);
+    function draw() {
+      const all = BL.bookingsForVendor(v.id);
+      const items = all.flatMap(({ booking, items }) => items.map((it) => ({ booking, it })));
+      const pending = items.filter((x) => x.it.status === "pending").sort((a, b) => (a.it.date + a.it.time).localeCompare(b.it.date + b.it.time));
+      const todays = items.filter((x) => x.it.date === today && (x.it.status === "confirmed" || x.it.status === "redeemed")).sort((a, b) => a.it.time.localeCompare(b.it.time));
+      const month = items.filter((x) => ["confirmed", "redeemed"].includes(x.it.status) && BL.daysUntil(x.it.date) > -30).reduce((s, x) => s + x.it.price, 0);
+      const slots = state.availability.filter((s) => s.vendorId === v.id && s.date === today).sort((a, b) => a.time.localeCompare(b.time));
+      const events = state.events.filter((e) => e.vendorId === v.id && e.status !== "past" && BL.daysUntil(e.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+      const hour = new Date().getHours();
+      view.innerHTML = `
+        <div class="page-head"><div><h1>${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${esc(v.contact.name.split(" ")[0])}</h1><p>${esc(v.name)} · ${fdate(today, "long")}${v.status !== "active" ? ` · ${BL.statusLabel(v.status)}` : ""}</p></div><a class="btn btn-primary" href="vendor-redemption.html">${icon("qr", "sm")}Redeem a code</a></div>
+        ${v.status !== "active" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">${v.status === "pending" ? "Blissers is reviewing your application. Offers go live the moment it is approved." : `This listing is suspended. ${esc(v.statusReason || "")}`}</p></div>` : ""}
+        <div class="grid-stats mb-8">
+          <a class="stat panel p-4 pressable" href="vendor-bookings.html?tab=pending"><span class="value">${pending.length}</span><span class="label muted">Awaiting your answer</span></a>
+          <a class="stat panel p-4 pressable" href="vendor-bookings.html"><span class="value">${todays.reduce((s, x) => s + x.it.guests, 0)}</span><span class="label muted">Guests today</span></a>
+          <div class="stat panel p-4"><span class="value" id="rev" data-v="0">${money(0)}</span><span class="label muted">Last 30 days</span></div>
+          <div class="stat panel p-4"><span class="value">${v.rating ? v.rating.toFixed(1) : "—"}</span><span class="label muted">${v.reviews ? BL.plural(v.reviews, "review") : "No reviews yet"}</span></div>
+        </div>
+        <div class="split">
+          <div>
+            <section class="section"><div class="section-title"><h2>Awaiting your answer</h2>${pending.length ? `<a href="vendor-bookings.html?tab=pending">All ${pending.length}</a>` : ""}</div>
+              ${pending.length ? `<div class="panel px-4 stagger">${pending.slice(0, 5).map(({ booking, it }, i) => { const o = BL.offer(it.offerId); const u = BL.user(booking.userId); return `<div class="row" style="--i:${i}"><span class="tile">${icon("clock", "sm")}</span><a class="body" href="vendor-booking.html?id=${booking.id}"><span class="title block truncate">${esc(u ? u.name : "Guest")} · ${BL.plural(it.guests, "guest")}</span><span class="sub block truncate">${esc(o.title)} · ${fdate(it.date)} at ${it.time} · ${money(it.price)}</span></a><span class="right"><button class="btn btn-secondary btn-sm" data-ok="${booking.id}" data-offer="${o.id}">Confirm</button><button class="btn btn-ghost btn-sm" data-no="${booking.id}" data-offer="${o.id}">Decline</button></span></div>`; }).join("")}</div>`
+              : `<div class="empty panel"><span class="tile">${icon("check")}</span><h3>Nothing waiting</h3><p>New requests from the concierge and direct bookings land here.</p></div>`}
+            </section>
+            <section class="section"><div class="section-title"><h2>Today</h2><a href="vendor-availability.html">Availability</a></div>
+              ${slots.length ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">${slots.map((s) => `<a class="slot ${s.open ? "" : "is-off"}" href="vendor-availability.html?date=${s.date}">${s.time}<small>${s.open ? `${s.booked} of ${s.capacity} booked` : "Closed"}</small></a>`).join("")}</div>` : ""}
+              ${todays.length ? `<div class="panel px-4">${todays.map(({ booking, it }) => { const o = BL.offer(it.offerId); const u = BL.user(booking.userId); return `<a class="row press" href="vendor-booking.html?id=${booking.id}"><span class="tile num text-sm">${it.time}</span><span class="body"><span class="title block truncate">${esc(u ? u.name : "Guest")} · ${BL.plural(it.guests, "guest")}</span><span class="sub block truncate">${esc(o.title)} · ${booking.code}</span></span><span class="right">${BL.badge(it.status)}${icon("chevron-right", "sm chev")}</span></a>`; }).join("")}</div>`
+              : `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>No guests booked today</h3><p>Confirmed bookings for today appear here with their arrival time.</p></div>`}
+            </section>
+          </div>
+          <div>
+            <section class="section"><div class="section-title"><h2>Your events</h2><a href="checkin.html">Door check-in</a></div>
+              ${events.length ? `<div class="panel px-4">${events.map((e) => `<a class="row press" href="checkin.html?event=${e.id}"><span class="tile">${icon("ticket", "sm")}</span><span class="body"><span class="title block truncate">${esc(e.title)}</span><span class="sub block truncate">${fdate(e.date)} · ${e.time} · ${e.sold} of ${e.capacity} sold</span></span>${icon("chevron-right", "sm chev")}</a>`).join("")}</div>`
+              : `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No events scheduled</h3><p>Blissers adds events with you from the back office.</p></div>`}
+            </section>
+            <section class="section"><div class="section-title"><h2>Shortcuts</h2></div>
+              <div class="card flex flex-col gap-2">
+                <a class="btn btn-secondary btn-block" href="vendor-availability.html">${icon("clock", "sm")}Open or close a slot</a>
+                <a class="btn btn-secondary btn-block" href="vendor-offers.html">${icon("tag", "sm")}Edit your offers</a>
+                <a class="btn btn-secondary btn-block" href="../ios/vendor.html?id=${v.id}">${icon("eye", "sm")}See your public page</a>
+              </div>
+            </section>
+          </div>
+        </div>`;
+      BL.countUp(document.getElementById("rev"), month, money);
+    }
+    draw();
+    BL.on(view, "click", "[data-ok]", (e, b) => { BL.vendorDecide(b.dataset.ok, b.dataset.offer, "confirm"); BL.toast("Confirmed. The guest has been told."); draw(); });
+    BL.on(view, "click", "[data-no]", (e, b) => {
+      BL.dialog({ title: "Decline this request?", body: `<p class="text-sm muted mb-4">The guest is refunded for this stop straight away and offered somewhere else instead.</p><div class="field"><label class="label" for="why">Reason</label><select class="select" id="why"><option>No availability at that time</option><option>Fully booked for a private event</option><option>Closed that day</option><option>Group too large</option></select></div>`,
+        actions: [{ label: "Keep it" }, { label: "Decline and refund", kind: "danger", onClick: (close, host) => { BL.vendorDecide(b.dataset.no, b.dataset.offer, "decline", host.querySelector("#why").value); close(); BL.toast("Declined. The guest is refunded."); draw(); } }] });
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="My Bookings / Wallet">
+<title>Wallet · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content"><div id="view"></div></main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fstamp, state } = BL;
+    BL.ios.shell({ title: "Wallet", back: "bookings.html", backLabel: "Bookings", tab: "bookings" });
+    const view = document.getElementById("view");
+    const DEFAULT_CARDS = ["Visa •• 4242", "Mastercard •• 8810"];
+    const cards = () => state.profile.cards || DEFAULT_CARDS;
+    const TX_ICON = { topup: "plus", payment: "card", refund: "undo", points: "gift" };
+    function draw(animate) {
+      const txs = state.walletTx.slice().sort((a, b) => b.at.localeCompare(a.at));
+      view.innerHTML = `
+        <div class="hero p-5 mb-6">
+          <p class="text-white/80 text-sm">Balance</p>
+          <p class="text-white num" style="font-size:36px;font-weight:500;line-height:1.1" id="balance" data-v="0">${money(0)}</p>
+          <div class="flex items-center justify-between mt-4">
+            <p class="text-white/80 text-sm"><span class="text-white num" id="points" data-v="0">0</span> points · worth ${money(Math.floor(state.profile.points / 10))}</p>
+            <button class="btn btn-primary btn-sm" id="topup">${icon("plus", "sm")}Top up</button>
+          </div>
+        </div>
+        <section class="section">
+          <div class="section-title"><h2>Payment methods</h2><button class="btn btn-ghost btn-sm" id="addCard">Add card</button></div>
+          <div class="group">
+            ${cards().map((c, i) => `<button class="row press" data-card="${i}">${icon("card", "sm")}<span class="body"><span class="title">${esc(c)}</span>${i === 0 ? `<span class="sub">Default</span>` : ""}</span>${icon("chevron-right", "sm chev")}</button>`).join("")}
+            <button class="row press" data-card="apple">${icon("phoneDevice", "sm")}<span class="body"><span class="title">Apple Pay</span><span class="sub">Set up on this iPhone</span></span>${icon("chevron-right", "sm chev")}</button>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Activity</h2></div>
+          ${txs.length ? `<div class="group stagger">${txs.map((t, i) => `<${t.bookingId ? `a href="booking.html?id=${t.bookingId}"` : `button data-tx="${t.id}"`} class="row press" style="--i:${Math.min(i, 14)}"><span class="tile">${icon(TX_ICON[t.type] || "wallet")}</span><span class="body"><span class="title block truncate">${esc(t.title)}</span><span class="sub">${fstamp(t.at)}</span></span><span class="right num ${t.amount > 0 ? "text-[var(--ok)]" : ""}">${t.type === "points" ? `+${t.points} pts` : (t.amount > 0 ? "+" : "") + money(t.amount)}</span>${icon("chevron-right", "sm chev")}</${t.bookingId ? "a" : "button"}>`).join("")}</div>`
+            : `<div class="empty"><span class="tile">${icon("wallet")}</span><h3>No activity yet</h3><p>Top-ups, payments and refunds show here.</p></div>`}
+        </section>`;
+      if (animate) { BL.countUp(document.getElementById("balance"), state.profile.walletBalance, money); BL.countUp(document.getElementById("points"), state.profile.points, String); }
+      else { document.getElementById("balance").textContent = money(state.profile.walletBalance); document.getElementById("points").textContent = String(state.profile.points); }
+    }
+    draw(true);
+    BL.on(view, "click", "#topup", () => {
+      let amount = 250, method = cards()[0];
+      const s = BL.sheet({ title: "Top up the wallet", body: `
+        <div class="seg mb-4" id="amt" role="group" aria-label="Amount">${[100, 250, 500, 1000].map((a) => `<button class="${a === amount ? "is-on" : ""}" data-amt="${a}" aria-pressed="${a === amount}">${money(a)}</button>`).join("")}</div>
+        <div class="group" role="radiogroup" aria-label="From">${cards().map((c) => `<button class="row press" role="radio" data-m="${esc(c)}" aria-checked="${c === method}">${icon("card", "sm")}<span class="body"><span class="title">${esc(c)}</span></span><span class="right" data-tick>${c === method ? icon("check", "sm") : ""}</span></button>`).join("")}</div>
+        <p class="help mt-2">Balance after: <span id="after">${money(state.profile.walletBalance + amount)}</span></p>`,
+        actions: [{ label: "Cancel" }, { label: "Add money", kind: "primary", onClick: (close) => { BL.topUp(amount, method); close(); draw(false); BL.toast(`${money(amount)} added`); } }] });
+      s.el.addEventListener("click", (e) => {
+        const a = e.target.closest("[data-amt]"), m = e.target.closest("[data-m]");
+        if (a) { amount = Number(a.dataset.amt); s.el.querySelectorAll("[data-amt]").forEach((x) => { const on = x === a; x.classList.toggle("is-on", on); x.setAttribute("aria-pressed", String(on)); }); s.el.querySelector("#after").textContent = money(state.profile.walletBalance + amount); }
+        if (m) { method = m.dataset.m; s.el.querySelectorAll("[data-m]").forEach((x) => { const on = x === m; x.setAttribute("aria-checked", String(on)); x.querySelector("[data-tick]").innerHTML = on ? icon("check", "sm") : ""; }); }
+      });
+    });
+    BL.on(view, "click", "#addCard", () => {
+      const s = BL.sheet({ title: "Add a card", body: `
+        <form id="cardForm" novalidate>
+          <div class="field mb-3"><label class="label" for="cn">Card number</label><input class="input num" id="cn" name="number" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" maxlength="19"><p class="error">Enter the 16 digits on the front.</p></div>
+          <div class="grid grid-cols-2 gap-3"><div class="field"><label class="label" for="ce">Expires</label><input class="input num" id="ce" name="exp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5"></div><div class="field"><label class="label" for="cc">CVC</label><input class="input num" id="cc" name="cvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div></div>
+          <p class="help mt-3">Demo only. Nothing is sent anywhere.</p>
+        </form>`,
+        actions: [{ label: "Cancel" }, { label: "Save card", kind: "primary", onClick: (close, host) => {
+          const f = host.querySelector("#cardForm"); const digits = f.number.value.replace(/\D/g, "");
+          if (digits.length < 12) { f.querySelector(".field").classList.add("is-invalid"); f.number.focus(); return; }
+          const brand = digits[0] === "5" ? "Mastercard" : digits[0] === "3" ? "Amex" : "Visa";
+          BL.saveProfile({ cards: cards().concat(`${brand} •• ${digits.slice(-4)}`) }); close(); draw(false); BL.toast("Card added");
+        } }] });
+      const num = s.el.querySelector("#cn"); num.addEventListener("input", () => { num.value = num.value.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 "); });
+      const exp = s.el.querySelector("#ce"); exp.addEventListener("input", () => { const d = exp.value.replace(/\D/g, "").slice(0, 4); exp.value = d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; });
+    });
+    BL.on(view, "click", "[data-card]", (e, b) => {
+      const k = b.dataset.card;
+      if (k === "apple") { BL.sheet({ title: "Apple Pay", body: `<p class="text-sm muted">Ready on this iPhone. Pick it on the payment screen and confirm with Face ID.</p>`, actions: [{ label: "OK", kind: "primary", onClick: (c) => c() }] }); return; }
+      const i = Number(k); const c = cards()[i];
+      BL.sheet({ title: c, body: `<div class="kv"><dt>Default</dt><dd>${i === 0 ? "Yes" : "No"}</dd><dt>Used for</dt><dd>Bookings, tickets, top-ups</dd></div>`, actions: [
+        ...(i !== 0 ? [{ label: "Make default", kind: "secondary", onClick: (close) => { const list = cards().slice(); list.splice(i, 1); list.unshift(c); BL.saveProfile({ cards: list }); close(); draw(false); BL.toast("Default card changed"); } }] : []),
+        ...(cards().length > 1 ? [{ label: "Remove", kind: "danger", onClick: async (close) => { if (!(await BL.confirm({ title: `Remove ${c}?`, body: "Bookings already paid with it are not affected.", ok: "Remove", danger: true }))) return; const list = cards().filter((x) => x !== c); BL.saveProfile({ cards: list }); close(); draw(false); BL.toast("Card removed"); } }] : []),
+        { label: "Done" }] });
+    });
+    BL.on(view, "click", "[data-tx]", (e, b) => {
+      const t = state.walletTx.find((x) => x.id === b.dataset.tx); if (!t) return;
+      BL.sheet({ title: t.title, body: `<div class="kv"><dt>Type</dt><dd>${{ topup: "Top-up", payment: "Payment", refund: "Refund", points: "Points" }[t.type] || t.type}</dd><dt>Amount</dt><dd>${t.type === "points" ? `${t.points} points` : money(t.amount)}</dd><dt>When</dt><dd>${fstamp(t.at)}</dd><dt>Reference</dt><dd class="num">${t.id.toUpperCase()}</dd></div>`, actions: [{ label: "Done", kind: "primary", onClick: (c) => c() }] });
+    });
+  })();
+</script>
+</body>
+</html>

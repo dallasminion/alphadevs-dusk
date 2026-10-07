@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Events & Tickets">
+<title>Event · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content" style="padding-bottom:150px"><div id="view" class="stagger"></div></main>
+<div class="ios-cta" id="cta" hidden><button class="btn btn-primary btn-lg btn-block" id="hold"><span class="spinner" aria-hidden="true"></span><span class="label">Hold tickets</span></button></div>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const e = BL.event(BL.qs("id"));
+    const v = e && BL.vendor(e.vendorId);
+    BL.ios.shell({ title: e ? e.title : "Event", back: "events.html", backLabel: "Events", tab: "events" });
+    const view = document.getElementById("view"), cta = document.getElementById("cta"), btn = document.getElementById("hold");
+    if (!e) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("ticket")}</span><h3>This event isn’t listed</h3><p>It may be over or the link is old.</p><a class="btn btn-primary btn-sm" href="events.html">Events</a></div>`; return; }
+    let qty = 2;
+    function draw() {
+      const left = BL.ticketsLeft(e); const past = e.status === "past" || BL.daysUntil(e.date) < 0; const soldOut = !past && (e.status === "sold_out" || left <= 0);
+      const mine = BL.myTickets().find((t) => t.eventId === e.id && t.status !== "released");
+      const pct = Math.round(((e.sold + e.held) / e.capacity) * 100);
+      qty = Math.max(1, Math.min(qty, Math.max(1, left), 8));
+      view.innerHTML = `
+        <div class="hero p-5 mb-6" style="min-height:160px;display:flex;flex-direction:column;justify-content:flex-end">
+          <p class="text-white/80 text-sm">${fdate(e.date, "long")} · ${e.time}</p>
+          <h1 class="text-white" style="font-size:26px">${esc(e.title)}</h1>
+          <p class="text-white/80 text-sm">${esc(e.venue)}${v ? ` · ${esc(v.area)}` : ""}</p>
+        </div>
+        ${mine ? `<a class="row press group mb-6" href="ticket.html?id=${mine.id}" style="padding:4px 16px">${icon("ticket", "sm")}<span class="body"><span class="title">${mine.status === "held" ? "You’re holding tickets" : "You have tickets"}</span><span class="sub">${BL.plural(mine.qty, "ticket")} · ${BL.statusLabel(mine.status)}</span></span>${icon("chevron-right", "sm chev")}</a>` : ""}
+        <div class="grid grid-cols-3 gap-2 mb-6">
+          <div class="stat"><span class="value">${e.price ? money(e.price) : "Free"}</span><span class="label">Per ticket</span></div>
+          <div class="stat"><span class="value">${past ? "Over" : soldOut ? "0" : left}</span><span class="label">${past ? "This event" : "Left"}</span></div>
+          <div class="stat"><span class="value">${e.capacity}</span><span class="label">Capacity</span></div>
+        </div>
+        <div class="meter mb-2" aria-hidden="true"><span style="width:${Math.min(100, pct)}%;background:var(--${pct >= 100 ? "bad" : pct >= 80 ? "wait" : "ok"})"></span></div>
+        <p class="muted text-sm mb-6">${past ? "The doors have closed." : soldOut ? "Every ticket is taken. Join the waitlist and we message you if one frees up." : pct >= 80 ? "Nearly full. Held tickets are kept for ten minutes." : `${e.sold} sold, ${e.held} on hold right now.`}</p>
+        <p class="mb-6 text-[15px] leading-relaxed">${esc(e.description)}</p>
+        ${v ? `<div class="group mb-6"><a class="row press" href="vendor.html?id=${v.id}"><span class="tile" style="width:36px;height:36px">${icon(BL.categoryIcon(v.category), "sm")}</span><span class="body"><span class="title block truncate">${esc(v.name)}</span><span class="sub block truncate">${esc(v.category)} · ${BL.vendorRating(v)}</span></span>${icon("chevron-right", "sm chev")}</a></div>` : ""}
+        ${!past && !soldOut ? `<section class="section"><div class="section-title"><h2>Tickets</h2></div><div class="flex items-center justify-between"><div class="stepper" aria-label="Tickets"><button id="minus" aria-label="Fewer tickets">${icon("minus", "sm")}</button><output>${qty}</output><button id="plus" aria-label="More tickets">${icon("plus", "sm")}</button></div><p class="text-sm muted">Up to 8 a person</p></div></section>` : ""}
+        ${soldOut ? `<button class="btn btn-secondary btn-block mb-4" id="waitlist">${icon("bell", "sm")}Join the waitlist</button>` : ""}
+        ${past ? `<a class="btn btn-secondary btn-block mb-4" href="events.html">See what’s next</a>` : ""}`;
+      Array.from(view.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+      cta.hidden = past || soldOut || !!(mine && mine.status === "held");
+      btn.querySelector(".label").textContent = e.price ? `Hold ${BL.plural(qty, "ticket")} · ${money(e.price * qty)}` : `Get ${BL.plural(qty, "free ticket")}`;
+    }
+    draw();
+    BL.on(view, "click", "#minus", () => { qty = Math.max(1, qty - 1); draw(); });
+    BL.on(view, "click", "#plus", () => { qty = Math.min(8, qty + 1); draw(); });
+    BL.on(view, "click", "#waitlist", (ev, b) => { b.disabled = true; b.innerHTML = `${icon("check", "sm")}On the waitlist`; BL.toast("We’ll message you if a ticket frees up"); });
+    btn.addEventListener("click", () => {
+      btn.classList.add("is-loading"); btn.disabled = true;
+      const r = BL.holdTickets(e.id, qty);
+      if (!r.ok) { btn.classList.remove("is-loading"); btn.disabled = false; BL.toast(r.reason); draw(); return; }
+      if (!e.price) { BL.payTickets(r.ticket.id, "Free"); setTimeout(() => { location.href = `ticket.html?id=${r.ticket.id}`; }, 300); return; }
+      setTimeout(() => { location.href = `ticket.html?id=${r.ticket.id}`; }, 300);
+    });
+  })();
+</script>
+</body>
+</html>

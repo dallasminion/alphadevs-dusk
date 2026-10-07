@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Vendor Portal">
+<title>Bookings · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Bookings</h1><p id="sub"></p></div><a class="btn btn-primary" href="vendor-redemption.html">Redeem a code</a></div>
+  <div class="toolbar">
+    <div class="seg" id="seg" role="group" aria-label="Show"><button data-f="pending" aria-pressed="false">Needs answer</button><button data-f="upcoming" class="is-on" aria-pressed="true">Upcoming</button><button data-f="past" aria-pressed="false">Past</button><button data-f="all" aria-pressed="false">All</button></div>
+    <div class="input-wrap ml-auto" id="qwrap"></div>
+  </div>
+  <div id="table"></div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const vid = state.session.vendorId;
+    BL.web.shell({ title: "Bookings", role: "vendor", active: "bookings", onSearch: (q) => { document.getElementById("q").value = q; filter = "all"; sync(); t.draw(); } });
+    document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Filter by guest or code" aria-label="Filter bookings" autocomplete="off">`;
+    let filter = BL.qs("tab") || "upcoming";
+    const rows0 = () => BL.bookingsForVendor(vid).map(({ booking, items }) => ({ id: booking.id, booking, items, user: BL.user(booking.userId), date: items.map((i) => i.date).sort()[0], time: items.map((i) => i.time).sort()[0], guests: Math.max(...items.map((i) => i.guests)), share: items.filter((i) => i.status !== "declined" && i.status !== "cancelled").reduce((s, i) => s + i.price, 0), status: items.some((i) => i.status === "pending") ? "pending" : items.every((i) => i.status === "redeemed") ? "redeemed" : items.every((i) => i.status === "declined" || i.status === "cancelled") ? items[0].status : "confirmed" }));
+    const groups = { pending: (r) => r.status === "pending", upcoming: (r) => (r.status === "confirmed" || r.status === "pending") && BL.daysUntil(r.date) >= 0, past: (r) => r.status === "redeemed" || (BL.daysUntil(r.date) < 0 && r.status !== "pending"), all: () => true };
+    const EMPTY = { pending: ["Nothing waiting", "Every request has an answer."], upcoming: ["No upcoming guests", "Confirmed and pending bookings for the days ahead show here."], past: ["No past bookings", "Redeemed and finished bookings show here."], all: ["No bookings yet", "Bookings from the concierge and direct bookings land here."] };
+    document.getElementById("sub").textContent = `${BL.plural(rows0().filter(groups.pending).length, "request")} waiting · ${BL.plural(rows0().filter(groups.upcoming).length, "upcoming booking")}`;
+    const rows = () => { const q = document.getElementById("q").value.trim().toLowerCase(); return rows0().filter(groups[filter] || groups.all).filter((r) => !q || `${r.user ? r.user.name : ""} ${r.booking.code} ${r.items.map((i) => BL.offer(i.offerId).title).join(" ")}`.toLowerCase().includes(q)); };
+    const t = BL.webTable(document.getElementById("table"), { rows, sort: "date", dir: filter === "past" ? "desc" : "asc", href: (r) => `vendor-booking.html?id=${r.id}`, pageSize: 10,
+      cols: [{ key: "guest", label: "Guest", sort: (r) => r.user ? r.user.name : "", render: (r) => `<span class="truncate">${esc(r.user ? r.user.name : "Guest")}</span>` }, { key: "code", label: "Code", sort: (r) => r.booking.code, render: (r) => `<span class="num">${r.booking.code}</span>` }, { key: "date", label: "When", sort: (r) => r.date + r.time, render: (r) => `${fdate(r.date)} · ${r.time}` }, { key: "what", label: "Offer", sort: (r) => BL.offer(r.items[0].offerId).title, render: (r) => `<span class="truncate">${r.items.map((i) => esc(BL.offer(i.offerId).title)).join(", ")}</span>` }, { key: "guests", label: "Guests", num: true }, { key: "share", label: "Your share", num: true, render: (r) => money(r.share) }, { key: "status", label: "Status", render: (r) => BL.badge(r.status) }],
+      card: (r) => ({ title: `${esc(r.user ? r.user.name : "Guest")} · ${BL.plural(r.guests, "guest")}`, meta: `${fdate(r.date)} · ${r.time} · ${r.items.map((i) => esc(BL.offer(i.offerId).title)).join(", ")}`, right: BL.badge(r.status) }),
+      get empty() { const [h, p] = EMPTY[filter] || EMPTY.all; return `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>${h}</h3><p>${p}</p><button class="btn btn-secondary btn-sm" data-f="all">Show everything</button></div>`; } });
+    const sync = () => document.querySelectorAll("#seg button").forEach((b) => { const on = b.dataset.f === filter; b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", String(on)); });
+    sync();
+    BL.on(document.body, "click", "[data-f]", (e, b) => { filter = b.dataset.f; t.state.dir = filter === "past" ? "desc" : "asc"; t.state.page = 0; sync(); t.draw(); history.replaceState(null, "", filter === "upcoming" ? "vendor-bookings.html" : `vendor-bookings.html?tab=${filter}`); });
+    document.getElementById("q").addEventListener("input", () => { t.state.page = 0; t.draw(); });
+  })();
+</script>
+</body>
+</html>

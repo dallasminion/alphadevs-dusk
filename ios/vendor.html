@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Home / Explore">
+<title>Place · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content"><div id="view" class="stagger"></div></main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const v = BL.vendor(BL.qs("id"));
+    BL.ios.shell({ title: v ? v.name : "Place", back: "explore.html", backLabel: "Explore", tab: "home" });
+    const view = document.getElementById("view");
+    if (!v) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("store")}</span><h3>This place isn’t listed</h3><p>It may have left Blissers or the link is old.</p><a class="btn btn-primary btn-sm" href="explore.html">Back to Explore</a></div>`; return; }
+    const offers = state.offers.filter((o) => o.vendorId === v.id && o.status === "active");
+    const events = state.events.filter((e) => e.vendorId === v.id && e.status !== "past").sort((a, b) => a.date.localeCompare(b.date));
+    const reviews = state.feedback.filter((f) => { const b = BL.booking(f.bookingId); return b && b.items.some((i) => i.vendorId === v.id); }).slice(0, 3);
+    view.innerHTML = `
+      <div class="hero p-5 mb-6" style="min-height:150px;display:flex;flex-direction:column;justify-content:flex-end">
+        <span class="tile mb-3" style="background:rgba(255,255,255,.14);color:#fff">${icon(BL.categoryIcon(v.category))}</span>
+        <h1 class="text-white" style="font-size:26px">${esc(v.name)}</h1>
+        <p class="text-white/80 text-sm">${esc(v.category)} · ${esc(v.area)} · ${BL.priceLevel(v.priceLevel)}</p>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mb-6">
+        <div class="stat"><span class="value">${v.rating ? v.rating.toFixed(1) : "New"}</span><span class="label">${v.reviews ? `${v.reviews} reviews` : "No reviews"}</span></div>
+        <div class="stat"><span class="value" style="font-size:17px">${esc(v.hours.split("–")[0])}</span><span class="label">Opens</span></div>
+        <div class="stat"><span class="value" style="font-size:17px">${esc(v.hours.split("–")[1] || "")}</span><span class="label">Closes</span></div>
+      </div>
+      <p class="mb-6 text-[15px] leading-relaxed">${esc(v.description)}</p>
+      ${v.status !== "active" ? `<div class="wash p-4 mb-6 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">This place is ${BL.statusLabel(v.status).toLowerCase()} and can’t take bookings right now.</p></div>` : ""}
+
+      <section class="section">
+        <div class="section-title"><h2>Offers</h2></div>
+        ${offers.length ? `<div class="group">${offers.map((o) => `<a class="row press" href="offer.html?id=${o.id}"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub block truncate">${o.duration ? `${o.duration} min · ` : ""}${esc(o.unit)}</span></span><span class="right">${money(o.price)}</span>${icon("chevron-right", "sm chev")}</a>`).join("")}</div>`
+          : `<div class="empty"><h3>Nothing bookable yet</h3><p>This place hasn’t published an offer.</p></div>`}
+      </section>
+
+      ${events.length ? `<section class="section"><div class="section-title"><h2>Events here</h2></div><div class="group">${events.map((e) => `<a class="row press" href="event.html?id=${e.id}"><span class="body"><span class="title block truncate">${esc(e.title)}</span><span class="sub block truncate">${fdate(e.date)} ${e.time} · ${esc(e.venue)}</span></span><span class="right">${e.status === "sold_out" ? BL.badge("sold_out") : e.price ? money(e.price) : "Free"}</span>${icon("chevron-right", "sm chev")}</a>`).join("")}</div></section>` : ""}
+
+      <section class="section">
+        <div class="section-title"><h2>From members</h2></div>
+        ${reviews.length ? `<div class="flex flex-col gap-3">${reviews.map((f) => `<div class="card"><div class="flex items-center justify-between mb-2"><span class="stars" aria-label="${f.rating} of 5">${[1, 2, 3, 4, 5].map((n) => `<span class="${n <= f.rating ? "is-on" : ""}" style="width:18px;height:18px;display:grid;place-items:center;color:${n <= f.rating ? "var(--bone)" : "var(--slate)"}">${icon("star", "sm")}</span>`).join("")}</span><span class="muted text-caption">${fdate(f.at)}</span></div><p class="text-sm">${esc(f.text)}</p></div>`).join("")}</div>`
+          : `<div class="empty"><h3>No reviews yet</h3><p>Members rate a place after their visit.</p></div>`}
+      </section>
+
+      <section class="section">
+        <div class="group">
+          <a class="row press" href="concierge.html?about=${v.id}">${icon("sparkle", "sm")}<span class="body"><span class="title">Ask the concierge about ${esc(v.name)}</span></span>${icon("chevron-right", "sm chev")}</a>
+          <a class="row press" href="tel:${esc(v.contact.phone.replace(/\s/g, ""))}">${icon("phone", "sm")}<span class="body"><span class="title">Call</span><span class="sub">${esc(v.contact.phone)}</span></span></a>
+        </div>
+      </section>`;
+    Array.from(view.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+  })();
+</script>
+</body>
+</html>

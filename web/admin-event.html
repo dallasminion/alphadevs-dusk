@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Event · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content"><div id="view"></div></div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    const isNew = BL.qs("new") === "1";
+    const e = isNew ? { title: "", vendorId: BL.qs("vendor") || "v1", venue: "", date: BL.day(7), time: "20:00", price: 0, capacity: 50, sold: 0, held: 0, status: "on_sale", description: "" } : BL.event(BL.qs("id"));
+    BL.web.shell({ title: isNew ? "New event" : e ? e.title : "Event", role: "admin", active: "catalog" });
+    const view = document.getElementById("view");
+    if (!e) { view.innerHTML = `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No such event</h3><a class="btn btn-primary btn-sm" href="admin-catalog.html?tab=events">Events</a></div>`; return; }
+    function draw() {
+      const tickets = isNew ? [] : state.tickets.filter((t) => t.eventId === e.id).sort((a, b) => (b.holdUntil || 0) - (a.holdUntil || 0));
+      const left = BL.ticketsLeft(e); const pct = e.capacity ? Math.round((e.sold / e.capacity) * 100) : 0;
+      const taken = e.sold * e.price;
+      view.innerHTML = `
+        <div class="crumbs"><a href="admin-catalog.html?tab=events">Events</a>${icon("chevron-right", "sm")}<span>${isNew ? "New event" : esc(e.title)}</span></div>
+        <div class="page-head"><div class="min-w-0"><h1 class="truncate">${isNew ? "New event" : esc(e.title)}</h1><p>${isNew ? "A ticketed night members can buy into" : `${fdate(e.date, "long")} at ${e.time} · ${esc(e.venue)}`}</p></div>${isNew ? "" : `<div class="flex items-center gap-2">${BL.badge(e.status)}<a class="btn btn-secondary" href="checkin.html?event=${e.id}">Door list</a><a class="btn btn-secondary" href="../ios/event.html?id=${e.id}">Member view</a></div>`}</div>
+        <div class="split">
+          <div>
+            <form class="card" id="ef" novalidate>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="field md:col-span-2"><label class="label" for="title">Title</label><input class="input" id="title" name="title" value="${esc(e.title)}" placeholder="Rooftop sunset session" autocomplete="off"><p class="error">Give the event a title.</p></div>
+                <div class="field"><label class="label" for="vendor">Host vendor</label><select class="select" id="vendor" name="vendorId">${state.vendors.filter((x) => x.status !== "suspended" || x.id === e.vendorId).map((x) => `<option value="${x.id}" ${x.id === e.vendorId ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
+                <div class="field"><label class="label" for="venue">Venue</label><input class="input" id="venue" name="venue" value="${esc(e.venue)}" placeholder="Port of Tel Aviv, Hangar 11" autocomplete="off"><p class="error">Where is it?</p></div>
+                <div class="field"><label class="label" for="date">Date</label><input class="input num" id="date" name="date" type="date" value="${e.date}" min="${BL.day(-365)}"><p class="error">Pick a date.</p></div>
+                <div class="field"><label class="label" for="time">Doors</label><input class="input num" id="time" name="time" type="time" value="${e.time}"><p class="error">Pick a time.</p></div>
+                <div class="field"><label class="label" for="price">Ticket price</label><input class="input num" id="price" name="price" type="number" inputmode="numeric" min="0" step="1" value="${e.price}"><p class="error">0 or more.</p></div>
+                <div class="field"><label class="label" for="capacity">Capacity</label><input class="input num" id="capacity" name="capacity" type="number" inputmode="numeric" min="1" step="1" value="${e.capacity}"><p class="error">Cannot be below the ${e.sold + e.held} already sold or held.</p></div>
+                <div class="field md:col-span-2"><label class="label" for="status">Status</label><select class="select" id="status" name="status">${[["on_sale", "On sale"], ["sold_out", "Sold out"], ["past", "Past"]].map(([k, l]) => `<option value="${k}" ${k === e.status ? "selected" : ""}>${l}</option>`).join("")}</select><p class="help">Sold out keeps the page up but stops sales.</p></div>
+                <div class="field md:col-span-2"><label class="label" for="description">Description</label><textarea class="textarea" id="description" name="description" rows="4">${esc(e.description)}</textarea></div>
+              </div>
+              <div class="flex gap-2 justify-end mt-6"><a class="btn btn-secondary" href="admin-catalog.html?tab=events">Cancel</a><button type="submit" class="btn btn-primary">${isNew ? "Put on sale" : "Save changes"}</button></div>
+            </form>
+          </div>
+          <div>
+            ${isNew ? `<div class="card"><h2 class="text-base font-medium mb-2">Tickets</h2><p class="text-sm muted">Members hold seats for ten minutes while they pay. Held seats come off the count on this page the moment they are taken.</p></div>` : `
+            <div class="card mb-6"><div class="flex items-baseline justify-between mb-2"><span class="text-sm">${e.sold} of ${e.capacity} sold</span><span class="text-sm muted">${pct}%</span></div><div class="meter" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Tickets sold"><span style="width:${pct}%"></span></div><div class="grid grid-cols-3 gap-3 mt-4 text-center"><div><div class="text-lg font-medium num">${e.held}</div><div class="text-xs muted">Held</div></div><div><div class="text-lg font-medium num">${left}</div><div class="text-xs muted">Left</div></div><div><div class="text-lg font-medium num">${money(taken)}</div><div class="text-xs muted">Taken</div></div></div></div>
+            <section class="section"><div class="section-title"><h2>Tickets</h2><a href="checkin.html?event=${e.id}">Check in</a></div><div id="tk"></div></section>`}
+          </div>
+        </div>`;
+      if (!isNew) BL.webTable(document.getElementById("tk"), { rows: tickets, sort: "status", href: (t) => `admin-user.html?id=${t.userId}`, pageSize: 8,
+        cols: [{ key: "buyer", label: "Buyer", sort: (t) => BL.user(t.userId).name, render: (t) => `<span class="truncate">${esc(BL.user(t.userId).name)}</span>` }, { key: "qty", label: "Seats", num: true, render: (t) => t.qty }, { key: "code", label: "Code", render: (t) => `<span class="num">${t.code}</span>` }, { key: "status", label: "Status", render: (t) => BL.badge(t.status) }],
+        card: (t) => ({ title: esc(BL.user(t.userId).name), meta: `${BL.plural(t.qty, "seat")} · ${t.code}`, right: BL.badge(t.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No tickets yet</h3><p>Sales appear here as members buy in.</p></div>` });
+      const form = document.getElementById("ef");
+      form.addEventListener("submit", (ev) => {
+        ev.preventDefault(); let bad = false; form.querySelectorAll(".field").forEach((x) => x.classList.remove("is-invalid"));
+        const mark = (n) => { form[n].closest(".field").classList.add("is-invalid"); bad = true; };
+        if (!form.title.value.trim()) mark("title"); if (!form.venue.value.trim()) mark("venue"); if (!form.date.value) mark("date"); if (!form.time.value) mark("time");
+        if (!(Number(form.price.value) >= 0)) mark("price"); if (!(Number(form.capacity.value) >= Math.max(1, e.sold + e.held))) mark("capacity");
+        if (bad) { form.querySelector(".is-invalid input, .is-invalid select").focus(); return; }
+        const patch = { title: form.title.value.trim(), vendorId: form.vendorId.value, venue: form.venue.value.trim(), date: form.date.value, time: form.time.value, price: Number(form.price.value), capacity: Number(form.capacity.value), status: form.status.value, description: form.description.value.trim() };
+        const saved = BL.saveEvent(isNew ? patch : { id: e.id, ...patch });
+        state.log.unshift({ at: BL.nowIso(), text: `${isNew ? "Put on sale" : "Edited"} “${saved.title}”` }); BL.save();
+        BL.toast(isNew ? "Event is on sale" : "Saved"); location.href = isNew ? `admin-event.html?id=${saved.id}` : "admin-catalog.html?tab=events";
+      });
+    }
+    draw();
+  })();
+</script>
+</body>
+</html>

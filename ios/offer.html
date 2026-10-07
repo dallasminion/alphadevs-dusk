@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Home / Explore">
+<title>Offer · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content" style="padding-bottom:150px"><div id="view" class="stagger"></div></main>
+<div class="ios-cta" id="cta" hidden>
+  <button class="btn btn-primary btn-lg btn-block" id="book"><span class="spinner" aria-hidden="true"></span><span class="label">Book</span></button>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const o = BL.offer(BL.qs("id"));
+    const v = o && BL.vendor(o.vendorId);
+    BL.ios.shell({ title: o ? o.title : "Offer", back: v ? `vendor.html?id=${v.id}` : "explore.html", backLabel: v ? v.name : "Explore" });
+    const view = document.getElementById("view");
+    if (!o) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("tag")}</span><h3>This offer is gone</h3><p>It may have been paused by the vendor.</p><a class="btn btn-primary btn-sm" href="explore.html">Back to Explore</a></div>`; return; }
+    const TIMES = { Dining: ["12:30", "13:30", "19:30", "21:00"], Nightlife: ["21:00", "22:45", "23:30"], Wellness: ["10:00", "12:00", "17:30", "19:00"], "Sea & Outdoors": ["08:00", "11:00", "17:15"], Culture: ["10:30", "16:00", "18:30"], Workshops: ["11:00", "15:00", "17:00", "19:00"], Stays: ["15:00"] };
+    const dates = BL.daysAhead(7);
+    const sel = { date: dates[0], time: null, guests: o.unit === "per couple" ? 2 : 2 };
+    const bookable = o.status === "active" && v.status === "active";
+
+    const slotsFor = (date) => {
+      const avail = state.availability.filter((a) => a.vendorId === v.id && a.date === date);
+      if (avail.length) return avail.map((a) => ({ time: a.time, left: a.open ? a.capacity - a.booked : 0, closed: !a.open }));
+      return TIMES[v.category].map((t) => ({ time: t, left: 6 }));
+    };
+    const total = () => BL.itemPrice(o, sel.guests);
+
+    function draw() {
+      const slots = slotsFor(sel.date);
+      if (!sel.time || !slots.find((s) => s.time === sel.time && s.left > 0)) sel.time = (slots.find((s) => s.left > 0) || {}).time || null;
+      view.innerHTML = `
+        <div class="card pad-lg mb-5" style="background:var(--graphite)">
+          <span class="tile mb-4">${icon(BL.categoryIcon(v.category))}</span>
+          <h1 style="font-size:24px">${esc(o.title)}</h1>
+          <p class="muted mt-1">${money(o.price)} ${esc(o.unit)}${o.duration ? ` · ${o.duration} min` : ""}</p>
+          ${(o.tags || []).length ? `<div class="chips mt-3">${o.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+        </div>
+        <a class="row press group mb-5" href="vendor.html?id=${v.id}" style="padding:4px 16px"><span class="tile" style="width:36px;height:36px">${icon("store", "sm")}</span><span class="body"><span class="title block truncate">${esc(v.name)}</span><span class="sub block truncate">${esc(v.area)} · ${BL.vendorRating(v)}</span></span>${icon("chevron-right", "sm chev")}</a>
+        <p class="mb-6 text-[15px] leading-relaxed">${esc(o.description)}</p>
+        ${bookable ? `
+        <section class="section">
+          <div class="section-title"><h2>When</h2></div>
+          <div class="hscroll mb-3" role="group" aria-label="Date">${dates.map((d) => `<button class="chip ${d === sel.date ? "is-on" : ""}" data-date="${d}" aria-pressed="${d === sel.date}" style="flex:none">${fdate(d)}</button>`).join("")}</div>
+          <div class="grid grid-cols-4 gap-2" role="group" aria-label="Time">${slots.map((s) => `<button class="slot ${s.time === sel.time ? "is-on" : ""} ${s.left <= 0 ? "is-off" : ""}" data-time="${s.time}" ${s.left <= 0 ? "disabled" : ""} aria-pressed="${s.time === sel.time}">${s.time}<small>${s.closed ? "Closed" : s.left <= 0 ? "Full" : s.left <= 2 ? `${s.left} left` : "Open"}</small></button>`).join("")}</div>
+          ${!slots.some((s) => s.left > 0) ? `<p class="help mt-2">Nothing open that day. Try another date.</p>` : ""}
+        </section>
+        <section class="section">
+          <div class="section-title"><h2>Guests</h2></div>
+          <div class="flex items-center justify-between">
+            <div class="stepper" aria-label="Guests"><button id="minus" aria-label="Fewer guests">${icon("minus", "sm")}</button><output id="guests">${sel.guests}</output><button id="plus" aria-label="More guests">${icon("plus", "sm")}</button></div>
+            <p class="text-sm muted">${o.unit === "per person" ? `${money(o.price)} each` : o.unit === "per couple" ? "Priced for two" : "One price for the group"}</p>
+          </div>
+        </section>
+        <div class="group mb-4">
+          <a class="row press" href="concierge.html?add=${o.id}">${icon("sparkle", "sm")}<span class="body"><span class="title">Add to a concierge plan</span><span class="sub">Build an evening around it</span></span>${icon("chevron-right", "sm chev")}</a>
+        </div>` : `<div class="wash p-4 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">This offer is ${BL.statusLabel(o.status === "active" ? v.status : o.status).toLowerCase()} and can’t be booked right now.</p></div>`}`;
+      Array.from(view.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+      const cta = document.getElementById("cta"); cta.hidden = !bookable;
+      const btn = document.getElementById("book"); btn.disabled = !sel.time;
+      btn.querySelector(".label").textContent = sel.time ? `Book ${fdate(sel.date)} ${sel.time} · ${money(total())}` : "Pick a time";
+    }
+    draw();
+    BL.on(view, "click", "[data-date]", (e, b) => { sel.date = b.dataset.date; sel.time = null; draw(); });
+    BL.on(view, "click", "[data-time]", (e, b) => { sel.time = b.dataset.time; draw(); });
+    BL.on(view, "click", "#minus", () => { sel.guests = Math.max(1, sel.guests - 1); draw(); });
+    BL.on(view, "click", "#plus", () => { sel.guests = Math.min(12, sel.guests + 1); draw(); });
+    document.getElementById("book").addEventListener("click", (e) => {
+      if (!sel.time) return;
+      const btn = e.currentTarget; btn.classList.add("is-loading"); btn.disabled = true;
+      const plan = { id: BL.uid("pl"), title: o.title, items: [{ offerId: o.id, vendorId: v.id, date: sel.date, time: sel.time, guests: sel.guests, price: total() }], status: "draft", createdAt: BL.nowIso(), request: "direct", preference: "any", guests: sel.guests, date: sel.date, total: total(), source: "direct" };
+      state.plans.unshift(plan); BL.save();
+      setTimeout(() => { location.href = `pay.html?plan=${plan.id}`; }, 300);
+    });
+  })();
+</script>
+</body>
+</html>

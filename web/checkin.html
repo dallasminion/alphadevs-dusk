@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Events & Tickets">
+<title>Check-in · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Door check-in</h1><p>Type or scan the code on a ticket. Each code checks in once.</p></div></div>
+  <div class="split">
+    <div>
+      <form class="card pad-lg mb-6" id="form" novalidate>
+        <div class="field mb-4"><label class="label" for="event">Event</label><select class="select" id="event"></select></div>
+        <div class="field mb-4"><label class="label" for="code">Ticket code</label><input class="input num" id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="TK-0000" style="font-size:22px;letter-spacing:.08em"><p class="help">Codes look like TK-7F3A.</p></div>
+        <button type="submit" class="btn btn-primary btn-lg btn-block">Check in</button>
+      </form>
+      <div id="result"></div>
+    </div>
+    <div>
+      <div class="grid grid-cols-2 gap-4 mb-6" id="stats"></div>
+      <section class="section"><div class="section-title"><h2>Checked in tonight</h2></div><div id="recent"></div></section>
+    </div>
+  </div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, fstamp, state } = BL;
+    BL.web.shell({ title: "Check-in", role: "vendor", active: "checkin" });
+    const vid = state.session.vendorId;
+    const sel = document.getElementById("event");
+    const events = state.events.filter((e) => e.vendorId === vid && e.status !== "past" && BL.daysUntil(e.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+    const all = events.length ? events : state.events.filter((e) => e.status !== "past" && BL.daysUntil(e.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+    sel.innerHTML = all.length ? all.map((e) => `<option value="${e.id}">${esc(e.title)} · ${fdate(e.date)}</option>`).join("") : `<option value="">No events scheduled</option>`;
+    if (BL.qs("event")) sel.value = BL.qs("event");
+    function drawSide() {
+      const e = BL.event(sel.value); const tickets = e ? state.tickets.filter((t) => t.eventId === e.id) : [];
+      const inside = tickets.filter((t) => t.status === "checked_in"); const paid = tickets.filter((t) => t.status === "paid" || t.status === "checked_in");
+      document.getElementById("stats").innerHTML = e ? `<div class="stat panel p-4"><span class="value">${inside.reduce((s, t) => s + t.qty, 0)}</span><span class="label muted">Inside</span></div><div class="stat panel p-4"><span class="value">${paid.reduce((s, t) => s + t.qty, 0)}</span><span class="label muted">Expected</span></div>` : "";
+      BL.render(document.getElementById("recent"), inside.length ? `<div class="panel px-4 stagger">${inside.sort((a, b) => (b.checkedInAt || "").localeCompare(a.checkedInAt || "")).map((t) => { const u = BL.user(t.userId); return `<div class="row"><span class="tile" style="color:var(--ok)">${icon("check", "sm")}</span><span class="body"><span class="title">${esc(u ? u.name : "Guest")}</span><span class="sub">${t.code} · ${BL.plural(t.qty, "ticket")}</span></span><span class="right muted text-sm">${BL.ftime(t.checkedInAt)}</span></div>`; }).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>Nobody in yet</h3><p>Doors open, the first code lands here.</p></div>`);
+    }
+    drawSide(); sel.addEventListener("change", drawSide);
+    const input = document.getElementById("code"); input.focus();
+    document.getElementById("form").addEventListener("submit", (ev) => {
+      ev.preventDefault(); const code = input.value.trim().toUpperCase(); const res = document.getElementById("result");
+      if (!code) { input.closest(".field").classList.add("is-invalid"); input.focus(); return; }
+      input.closest(".field").classList.remove("is-invalid");
+      const r = BL.checkIn(code, sel.value || undefined);
+      if (r.ok) { const u = BL.user(r.ticket.userId); const e = BL.event(r.ticket.eventId); res.innerHTML = `<div class="card enter" style="border-color:var(--ok)"><div class="flex items-center gap-3"><span class="tile success-ring" style="color:var(--ok)">${icon("check")}</span><div class="min-w-0 flex-1"><p class="font-medium">Welcome, ${esc(u ? u.name.split(" ")[0] : "guest")}</p><p class="muted text-sm">${BL.plural(r.ticket.qty, "ticket")} · ${esc(e.title)} · ${code}</p></div></div></div>`; BL.toast(`${BL.plural(r.ticket.qty, "ticket")} checked in`); }
+      else { res.innerHTML = `<div class="card enter" style="border-color:var(--bad)"><div class="flex items-center gap-3"><span class="tile" style="color:var(--bad)">${icon("x")}</span><div class="min-w-0 flex-1"><p class="font-medium">Not admitted</p><p class="muted text-sm">${esc(r.reason || "That code does not match a ticket.")} · ${code}</p></div></div></div>`; }
+      input.value = ""; input.focus(); drawSide();
+    });
+    input.addEventListener("input", () => { input.value = input.value.toUpperCase(); });
+  })();
+</script>
+</body>
+</html>

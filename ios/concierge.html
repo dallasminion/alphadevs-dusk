@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Concierge Chat">
+<title>Concierge · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content" style="padding-bottom:200px">
+  <div class="chat" id="chat" aria-live="polite"></div>
+</main>
+<form class="composer with-tabs" id="composer">
+  <button type="button" class="btn btn-ghost btn-icon" id="mic" aria-label="Speak your request" aria-pressed="false">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </button>
+  <textarea class="textarea" id="text" rows="1" placeholder="What do you feel like doing?" aria-label="Message the concierge" enterkeyhint="send" autocomplete="off" style="flex:1;min-width:0"></textarea>
+  <button type="submit" class="btn btn-primary btn-icon" id="send" aria-label="Send">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 16-8-5 16-3-7z"/></svg>
+  </button>
+</form>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    BL.ios.shell({ title: "Concierge", tab: "concierge", right: `<button class="btn btn-ghost btn-sm" id="fresh">New</button>` });
+    const chat = document.getElementById("chat"), form = document.getElementById("composer"), text = document.getElementById("text"), mic = document.getElementById("mic");
+    const scroll = document.getElementById("content");
+    if (!state.chat.messages.length) BL.resetChat();
+
+    const planCard = (id) => { const p = BL.plan(id); if (!p) return ""; const bs = BL.budgetStatus(p.total, p.frame && p.frame.budget); return `
+      <a class="card block mt-1 pressable" href="plan.html?id=${p.id}" style="max-width:300px">
+        <div class="flex items-center justify-between gap-2 mb-2"><strong class="truncate">${esc(p.title)}</strong>${p.status === "booked" ? BL.badge("confirmed") : `<span class="badge badge-${bs.tone === "bad" ? "bad" : bs.tone === "wait" ? "wait" : "ok"}">${money(p.total)}</span>`}</div>
+        <div class="flex flex-col gap-1 mb-3">${p.items.map((it) => { const o = BL.offer(it.offerId); return `<div class="flex gap-2 text-sm min-w-0"><span class="num muted" style="flex:none">${it.time}</span><span class="truncate">${esc(o.title)}</span></div>`; }).join("")}</div>
+        <div class="flex items-center justify-between text-sm"><span class="muted">${p.scope === "trip" ? `${fdate(p.date)}, ${BL.plural(p.frame.nights || 1, "night")}` : fdate(p.date)} · ${BL.plural(p.guests, "guest")}</span><span class="flex items-center gap-1">${p.status === "booked" ? "Booked" : "Review"} ${icon("chevron-right", "sm")}</span></div>
+      </a>`; };
+    const optionCard = (o, mi, oi) => { const of = BL.offer(o.offerId), v = BL.vendor(of.vendorId); return `
+      <div class="option ${o.over ? "over" : ""}">
+        <div class="head"><div class="min-w-0"><strong class="block truncate">${esc(v.name)}</strong><span class="line block truncate">${esc(of.title)} · ${esc(o.label)} · ${esc(o.time)} ${fdate(o.date)}</span></div><span class="num">${money(o.price)}</span></div>
+        ${o.line ? `<p class="line">${esc(o.line)}</p>` : ""}${o.why ? `<p class="why">${esc(o.why)}</p>` : ""}
+        <div class="foot"><a class="muted text-sm" href="offer.html?id=${of.id}">Details</a><button class="btn btn-secondary btn-sm press" data-reserve="${mi}:${oi}">${o.over ? "Reserve anyway" : "Reserve"}</button></div>
+      </div>`; };
+    const diffList = (d) => `<div class="diff">${d.map((x) => `<div class="d ${x.op === "-" ? "minus" : x.op === "+" ? "plus" : "same"}"><b>${x.op}</b><span>${esc(x.title)}${x.why ? ` · ${esc(x.why)}` : ""}</span></div>`).join("")}</div>`;
+    const traceList = (t) => `<details class="trace"><summary>Why these</summary><ul>${t.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>`;
+    const bubble = (m, mi, last) => `<div class="bubble ${m.from === "me" ? "me" : "ai"}"><span>${esc(m.text)}</span>${m.diff && m.diff.length ? diffList(m.diff) : ""}${m.trace && m.trace.length ? traceList(m.trace) : ""}<span class="time">${BL.ftime(m.at)}</span></div>${m.options && m.options.length ? `<div class="options stagger">${m.options.map((o, oi) => optionCard(o, mi, oi)).join("")}</div>` : ""}${m.planId ? planCard(m.planId) : ""}${m.chips && last ? `<div class="chips mt-1 mb-2">${m.chips.map((c) => `<button class="chip" data-chip="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}`;
+
+    function draw() {
+      const ms = state.chat.messages;
+      chat.innerHTML = ms.map((m, i) => bubble(m, i, i === ms.length - 1)).join("");
+      scroll.scrollTop = scroll.scrollHeight;
+    }
+    const typing = () => { const t = document.createElement("div"); t.className = "bubble ai typing"; t.innerHTML = "<i></i><i></i><i></i>"; chat.appendChild(t); scroll.scrollTop = scroll.scrollHeight; return t; };
+
+    let busy = false;
+    function send(msg) {
+      const t = (msg || "").trim(); if (!t || busy) return;
+      busy = true; text.value = ""; text.style.height = "";
+      const replies = BL.conciergeSend(t);
+      draw();
+      let delay = 500;
+      replies.forEach((r, i) => {
+        setTimeout(() => { const tp = typing(); setTimeout(() => { tp.remove(); BL.conciergeReply(r); draw(); if (i === replies.length - 1) busy = false; }, 700 + Math.min(900, r.text.length * 6)); }, delay);
+        delay += 1200 + Math.min(900, r.text.length * 6);
+      });
+    }
+    form.addEventListener("submit", (e) => { e.preventDefault(); send(text.value); });
+    text.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text.value); } });
+    text.addEventListener("input", () => { text.style.height = ""; text.style.height = Math.min(120, text.scrollHeight) + "px"; });
+    BL.on(chat, "click", "[data-chip]", (e, b) => {
+      const c = b.dataset.chip;
+      if (/^review plan$/i.test(c) && state.chat.planId) { location.href = `plan.html?id=${state.chat.planId}`; return; }
+      send(c);
+    });
+    BL.on(chat, "click", "[data-reserve]", (e, b) => {
+      const [mi, oi] = b.dataset.reserve.split(":").map(Number);
+      const m = state.chat.messages[mi]; const o = m && m.options && m.options[oi]; if (!o) return;
+      const p = BL.reservePlan(o); draw();
+      setTimeout(() => { location.href = `pay.html?plan=${p.id}`; }, 450);
+    });
+    document.getElementById("fresh").addEventListener("click", async () => {
+      if (state.chat.messages.length > 1 && !(await BL.confirm({ title: "Start a new conversation?", body: "The current chat is cleared. Plans you already booked stay in your bookings.", ok: "Start new" }))) return;
+      BL.resetChat(); draw();
+    });
+
+    const SAMPLES = ["A quiet dinner for two on Saturday", "Something relaxing tomorrow evening for two, then dinner after", "A weekend away for two, 2 nights", "Saturday daytime on the water for four of us, lunch after", "Tonight, just me, a workshop and a late bar, budget 400"];
+    let listening = false, timer = null;
+    mic.addEventListener("click", () => {
+      if (listening) { clearTimeout(timer); stopListening(); return; }
+      listening = true; mic.setAttribute("aria-pressed", "true"); mic.classList.add("pulse");
+      text.disabled = true; text.placeholder = "Listening…";
+      const wave = document.createElement("div"); wave.className = "wave"; wave.id = "wave"; wave.setAttribute("aria-hidden", "true"); wave.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i><i></i>";
+      text.insertAdjacentElement("afterend", wave); text.style.display = "none";
+      timer = setTimeout(() => { stopListening(); text.value = SAMPLES[state.chat.messages.length % SAMPLES.length]; text.dispatchEvent(new Event("input")); text.focus(); BL.toast("Heard you. Edit or send."); }, 1800);
+    });
+    function stopListening() { listening = false; mic.setAttribute("aria-pressed", "false"); mic.classList.remove("pulse"); const w = document.getElementById("wave"); if (w) w.remove(); text.style.display = ""; text.disabled = false; text.placeholder = "What do you feel like doing?"; }
+
+    draw();
+    const add = BL.qs("add"), about = BL.qs("about");
+    if (add && BL.offer(add)) {
+      const o = BL.offer(add), v = BL.vendor(o.vendorId);
+      const p = state.chat.planId && BL.plan(state.chat.planId);
+      if (p && p.status === "draft" && !p.items.some((it) => it.offerId === o.id)) {
+        BL.addPlanItem(p.id, o.id);
+        BL.conciergeReply({ from: "ai", text: `Added ${o.title} at ${v.name} to your plan. New total ${money(p.total)}, ${BL.budgetStatus(p.total, p.frame && p.frame.budget).label.toLowerCase()}.`, planId: p.id, chips: ["Review plan", "Make it cheaper", "Start over"], at: BL.nowIso() });
+        draw();
+      } else { text.value = `Build an evening around ${o.title} at ${v.name} for two, this weekend`; text.dispatchEvent(new Event("input")); text.focus(); }
+      history.replaceState(null, "", "concierge.html");
+    } else if (about && BL.vendor(about)) {
+      const v = BL.vendor(about);
+      text.value = `Plan something around ${v.name} in ${v.area} for two`; text.dispatchEvent(new Event("input")); text.focus();
+      history.replaceState(null, "", "concierge.html");
+    }
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Onboarding & Profile">
+<title>Set up · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <div class="meter mb-5" aria-hidden="true"><span id="progress" style="width:50%"></span></div>
+  <form id="form" class="flex flex-col gap-5" novalidate></form>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const step = Math.min(2, Math.max(1, Number(BL.qs("step") || 1)));
+    const fromProfile = BL.qs("from") === "profile";
+    const back = fromProfile ? "profile.html" : step === 1 ? "onboarding.html" : `setup.html?step=${step - 1}`;
+    BL.ios.shell({ title: fromProfile ? "Preferences" : `Step ${step} of 2`, back, backLabel: fromProfile ? "Profile" : "Back", backHard: true });
+    document.getElementById("progress").style.width = `${Math.round(step / 2 * 100)}%`;
+    const p = BL.state.profile;
+    const form = document.getElementById("form");
+    const { esc, icon } = BL;
+    const cities = ["Tel Aviv", "Jaffa", "Herzliya", "Ramat Gan", "Givatayim", "Haifa", "Jerusalem"];
+    const next = fromProfile ? "profile.html" : step === 2 ? "home.html" : `setup.html?step=${step + 1}`;
+    const cta = fromProfile ? "Save" : step === 2 ? "Finish" : "Continue";
+
+    const views = {
+      1: () => `
+        <h1 class="large-title">About you</h1>
+        <div class="field"><label class="label" for="name">Full name</label>
+          <input class="input" id="name" name="name" type="text" autocomplete="name" value="${esc(p.name)}" placeholder="Maya Levi">
+          <p class="error">We need a name for your bookings.</p></div>
+        <div class="field"><label class="label" for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="email" value="${esc(p.email)}" placeholder="you@example.com" spellcheck="false">
+          <p class="help">Receipts and plan summaries go here.</p></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="field"><label class="label" for="city">City</label>
+            <select class="select" id="city" name="city">${cities.map((c) => `<option ${c === p.city ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+          <div class="field"><label class="label" for="area">Neighbourhood</label>
+            <input class="input" id="area" name="area" type="text" autocomplete="address-level3" value="${esc(p.area)}" placeholder="Florentin"></div>
+        </div>`,
+      2: () => `
+        <h1 class="large-title">What you’re into<small>Pick as many as you like. Budget, timing and company come up in the chat, only when a plan needs them.</small></h1>
+        <div class="chips stagger" id="interests" role="group" aria-label="Interests">
+          ${BL.state.categories.map((c) => `<button type="button" class="chip ${p.interests.includes(c.id) ? "is-on" : ""}" data-cat="${esc(c.id)}" aria-pressed="${p.interests.includes(c.id)}" style="min-height:40px;padding:6px 14px">${icon(c.icon, "sm")}${esc(c.id)}</button>`).join("")}
+        </div>
+        <p class="error" id="interestsError">Pick at least one.</p>`,
+    };
+
+    form.innerHTML = views[step]() + `<button type="submit" class="btn btn-primary btn-lg btn-block mt-2"><span class="spinner" aria-hidden="true"></span><span class="label">${cta}</span></button>`;
+
+    let interests = p.interests.slice();
+    BL.on(form, "click", "[data-cat]", (e, b) => {
+      const c = b.dataset.cat; const on = !interests.includes(c);
+      interests = on ? [...interests, c] : interests.filter((x) => x !== c);
+      b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", String(on));
+      document.getElementById("interestsError").style.display = "";
+    });
+    BL.on(form, "input", ".input", (e, i) => i.closest(".field")?.classList.remove("is-invalid"));
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (step === 1) {
+        const name = form.name.value.trim();
+        if (!name) { form.name.closest(".field").classList.add("is-invalid"); form.name.focus(); return; }
+        BL.saveProfile({ name, email: form.email.value.trim() || p.email, city: form.city.value, area: form.area.value.trim() });
+      } else {
+        if (!interests.length) { document.getElementById("interestsError").style.display = "block"; return; }
+        BL.saveProfile({ interests, onboarded: true });
+      }
+      const btn = form.querySelector("[type=submit]"); btn.classList.add("is-loading"); btn.disabled = true;
+      setTimeout(() => { location.href = next; }, 350);
+    });
+  })();
+</script>
+</body>
+</html>

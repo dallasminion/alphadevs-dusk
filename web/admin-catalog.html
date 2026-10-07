@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Back Office">
+<title>Catalogue · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body>
+<div class="web-shell">
+<main class="web-main">
+<div class="page" id="content">
+  <div class="page-head"><div><h1>Catalogue</h1><p id="sub"></p></div><a class="btn btn-primary" id="new" href="admin-offer.html?new=1">New offer</a></div>
+  <div class="toolbar">
+    <div class="seg" role="tablist" aria-label="Catalogue section"><button type="button" class="is-on" data-tab="offers" role="tab" aria-pressed="true">Offers</button><button type="button" data-tab="events" role="tab" aria-pressed="false">Events</button></div>
+    <select class="select" id="vendor" aria-label="Vendor"></select>
+    <select class="select" id="status" aria-label="Status"></select>
+    <div class="input-wrap ml-auto" id="qwrap"></div>
+  </div>
+  <div id="table"></div>
+</div>
+</main>
+</div>
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    BL.web.shell({ title: "Catalogue", role: "admin", active: "catalog", onSearch: (s) => { q.value = s; redraw(); } });
+    document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Title or vendor" aria-label="Filter the catalogue" autocomplete="off">`;
+    const q = document.getElementById("q"), vendor = document.getElementById("vendor"), status = document.getElementById("status"), host = document.getElementById("table"), newBtn = document.getElementById("new");
+    vendor.innerHTML = `<option value="">Every vendor</option>${state.vendors.map((v) => `<option value="${v.id}">${esc(v.name)}</option>`).join("")}`;
+    if (BL.qs("vendor")) vendor.value = BL.qs("vendor");
+    let tab = BL.qs("tab") === "events" ? "events" : "offers";
+    const STATUSES = { offers: [["", "Every status"], ["active", "Active"], ["paused", "Paused"], ["draft", "Draft"]], events: [["", "Every status"], ["on_sale", "On sale"], ["sold_out", "Sold out"], ["past", "Past"]] };
+    const vname = (id) => (BL.vendor(id) || { name: "—" }).name;
+    const bookingsUsing = (o) => state.bookings.filter((b) => b.items.some((i) => i.offerId === o.id)).length;
+    function build() {
+      status.innerHTML = STATUSES[tab].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+      newBtn.textContent = tab === "offers" ? "New offer" : "New event"; newBtn.href = tab === "offers" ? "admin-offer.html?new=1" : "admin-event.html?new=1";
+      document.querySelectorAll("[data-tab]").forEach((b) => { const on = b.dataset.tab === tab; b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", on); });
+      document.getElementById("sub").textContent = tab === "offers" ? `${BL.plural(state.offers.filter((o) => o.status === "active").length, "live offer")} across ${BL.plural(state.vendors.filter((v) => v.status === "active").length, "vendor")}` : `${BL.plural(state.events.filter((e) => e.status === "on_sale").length, "event")} on sale`;
+      const match = (x) => { const s = q.value.trim().toLowerCase(); return (!vendor.value || x.vendorId === vendor.value) && (!status.value || x.status === status.value) && (!s || `${x.title} ${vname(x.vendorId)} ${x.venue || ""}`.toLowerCase().includes(s)); };
+      host.innerHTML = "";
+      if (tab === "offers") return BL.webTable(host, { rows: () => state.offers.filter(match), sort: "title", href: (o) => `admin-offer.html?id=${o.id}`, pageSize: 12,
+        cols: [{ key: "title", label: "Offer", render: (o) => `<span class="truncate">${esc(o.title)}</span>` }, { key: "vendor", label: "Vendor", sort: (o) => vname(o.vendorId), render: (o) => esc(vname(o.vendorId)) }, { key: "price", label: "Price", num: true, render: (o) => `${money(o.price)} <span class="muted">${esc(o.unit)}</span>` }, { key: "duration", label: "Length", num: true, render: (o) => `${o.duration} min` }, { key: "uses", label: "Bookings", num: true, sort: bookingsUsing, render: bookingsUsing }, { key: "status", label: "Status", render: (o) => BL.badge(o.status) }],
+        card: (o) => ({ title: esc(o.title), meta: `${esc(vname(o.vendorId))} · ${money(o.price)} ${esc(o.unit)}`, right: BL.badge(o.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("tag")}</span><h3>No offers match</h3><p>Clear a filter, or add the offer yourself.</p><a class="btn btn-secondary btn-sm" href="admin-offer.html?new=1">New offer</a></div>` });
+      return BL.webTable(host, { rows: () => state.events.filter(match), sort: "date", href: (e) => `admin-event.html?id=${e.id}`, pageSize: 12,
+        cols: [{ key: "title", label: "Event", render: (e) => `<span class="truncate">${esc(e.title)}</span>` }, { key: "vendor", label: "Venue", sort: (e) => e.venue, render: (e) => `<span class="truncate">${esc(e.venue)}</span>` }, { key: "date", label: "When", render: (e) => `${fdate(e.date, "short")} · ${e.time}` }, { key: "price", label: "Price", num: true, render: (e) => money(e.price) }, { key: "sold", label: "Sold", num: true, render: (e) => `${e.sold} / ${e.capacity}` }, { key: "status", label: "Status", render: (e) => BL.badge(e.status) }],
+        card: (e) => ({ title: esc(e.title), meta: `${fdate(e.date, "short")} · ${e.time} · ${e.sold} of ${e.capacity} sold`, right: BL.badge(e.status) }),
+        empty: `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No events match</h3><p>Clear a filter, or put a night on sale.</p><a class="btn btn-secondary btn-sm" href="admin-event.html?new=1">New event</a></div>` });
+    }
+    let t = build();
+    const redraw = () => { t.state.page = 0; t.draw(); };
+    [vendor, status].forEach((el) => el.addEventListener("change", redraw)); q.addEventListener("input", redraw);
+    BL.on(document.body, "click", "[data-tab]", (e, b) => { tab = b.dataset.tab; history.replaceState(null, "", `?tab=${tab}`); t = build(); });
+  })();
+</script>
+</body>
+</html>

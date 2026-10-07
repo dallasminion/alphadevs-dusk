@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="My Bookings / Wallet">
+<title>Bookings · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <h1 class="large-title">Bookings</h1>
+  <a class="row press group mb-5" href="wallet.html" style="padding:4px 16px" id="walletRow"></a>
+  <div class="seg mb-5" id="seg" role="group" aria-label="Show">
+    <button data-tab="upcoming" class="is-on" aria-pressed="true">Upcoming</button>
+    <button data-tab="past" aria-pressed="false">Past</button>
+    <button data-tab="cancelled" aria-pressed="false">Cancelled</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, state } = BL;
+    BL.ios.shell({ title: "Bookings", tab: "bookings", large: true });
+    let tab = BL.qs("tab") || "upcoming";
+    document.getElementById("walletRow").innerHTML = `${icon("wallet", "sm")}<span class="body"><span class="title">Wallet</span><span class="sub">${money(state.profile.walletBalance)} · ${state.profile.points} points</span></span>${icon("chevron-right", "sm chev")}`;
+    const all = BL.myBookings();
+    const upcoming = (b) => ["confirmed", "pending", "partial"].includes(b.status) && BL.daysUntil(BL.firstDate(b)) >= 0;
+    const groups = {
+      upcoming: all.filter(upcoming).sort((a, b) => BL.firstDate(a).localeCompare(BL.firstDate(b))),
+      past: all.filter((b) => !upcoming(b) && !["cancelled", "refunded"].includes(b.status)).sort((a, b) => BL.firstDate(b).localeCompare(BL.firstDate(a))),
+      cancelled: all.filter((b) => ["cancelled", "refunded"].includes(b.status)).sort((a, b) => (b.cancelledAt || b.createdAt).localeCompare(a.cancelledAt || a.createdAt)),
+    };
+    const EMPTY = { upcoming: ["sparkle", "Nothing planned yet", "Ask the concierge for an evening, or book a place from Explore.", "concierge.html", "Plan something"], past: ["calendar", "No past bookings", "Finished bookings land here with a place to rate them.", "explore.html", "Explore"], cancelled: ["x-circle", "Nothing cancelled", "Good. Cancelled bookings and their refunds show here.", "explore.html", "Explore"] };
+    const row = (b) => { const live = BL.liveItems(b); const cats = [...new Set(live.map((i) => BL.vendor(i.vendorId).category))]; return `<a class="row press" href="booking.html?id=${b.id}"><span class="tile">${icon(BL.categoryIcon(cats[0] || "Dining"))}</span><span class="body"><span class="title block truncate">${esc(b.title)}</span><span class="sub block truncate">${BL.bookingWhen(b)} · ${BL.stops(b)} · ${money(b.status === "cancelled" || b.status === "refunded" ? b.total : live.reduce((s, i) => s + i.price, 0))}</span></span><span class="right">${BL.badge(b.status)}</span>${icon("chevron-right", "sm chev")}</a>`; };
+    function draw() {
+      document.querySelectorAll("#seg button").forEach((b) => { const on = b.dataset.tab === tab; b.classList.toggle("is-on", on); b.setAttribute("aria-pressed", String(on)); });
+      const items = groups[tab] || []; const [ic, h, p, href, cta] = EMPTY[tab] || EMPTY.upcoming;
+      BL.render(document.getElementById("list"), items.length ? `<div class="group stagger">${items.map(row).join("")}</div>` : `<div class="empty"><span class="tile">${icon(ic)}</span><h3>${h}</h3><p>${p}</p><a class="btn btn-secondary btn-sm" href="${href}">${cta}</a></div>`);
+      const g = document.querySelector("#list .stagger"); if (g) Array.from(g.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+    }
+    draw();
+    BL.on(document.getElementById("seg"), "click", "[data-tab]", (e, b) => { tab = b.dataset.tab; history.replaceState(null, "", tab === "upcoming" ? "bookings.html" : `bookings.html?tab=${tab}`); draw(); });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Plan & Booking Review">
+<title>Plan · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content" style="padding-bottom:150px"><div id="view"></div></main>
+<div class="ios-cta" id="cta" hidden>
+  <button class="btn btn-primary btn-lg btn-block" id="pay"><span class="label">Review and pay</span></button>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const { esc, icon, money, fdate, state } = BL;
+    const p = BL.plan(BL.qs("id"));
+    BL.ios.shell({ title: p ? p.title : "Plan", back: "concierge.html", backLabel: "Concierge" });
+    const view = document.getElementById("view"), cta = document.getElementById("cta"), payBtn = document.getElementById("pay");
+    if (!p) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("sparkle")}</span><h3>No plan here</h3><p>Ask the concierge for one and it shows up on this screen.</p><a class="btn btn-primary btn-sm" href="concierge.html">Open the concierge</a></div>`; return; }
+    const trip = p.scope === "trip";
+    const stop = (it, i) => { const o = BL.offer(it.offerId), v = BL.vendor(it.vendorId); const sh = BL.bookingShape(o); return `
+      <div class="stop ok" style="--i:${i}">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="muted text-sm num">${it.time}${o.duration ? ` · ${o.duration} min` : ""}${it.nights ? ` · ${BL.plural(it.nights, "night")}` : ""}${it.label ? ` · ${esc(it.label)}` : ""}</p>
+            <a class="block font-medium truncate" href="offer.html?id=${o.id}">${esc(o.title)}</a>
+            <p class="muted text-sm truncate">${esc(v.name)} · ${esc(v.area)}</p>
+            ${it.why ? `<p class="text-sm mt-1">${esc(it.why)}</p>` : ""}
+            <p class="muted text-sm mt-1">${esc(sh.hold)} · ${esc(sh.cancel)}</p>
+          </div>
+          <span class="num" style="flex:none">${money(it.price)}${it.requotedFrom ? `<span class="block text-sm muted line-through text-right">${money(it.requotedFrom)}</span>` : ""}</span>
+        </div>
+        ${p.status === "draft" ? `<div class="flex gap-2 mt-2"><button class="btn btn-secondary btn-sm" data-swap="${i}">${icon("swap", "sm")}Swap</button><button class="btn btn-ghost btn-sm" data-remove="${i}">${icon("trash", "sm")}Remove</button></div>` : ""}
+      </div>`; };
+    const info = (x, i) => `
+      <div class="stop" style="--i:${i}">
+        <p class="muted text-sm num">${x.time}</p>
+        ${x.href ? `<a class="block font-medium truncate" href="${x.href}">${esc(x.title)}</a>` : `<p class="font-medium truncate">${esc(x.title)}</p>`}
+        <p class="muted text-sm">${esc(x.note)}</p>
+      </div>`;
+    const budgetLine = (bs, b) => {
+      if (bs.key === "none") return "No budget set yet. Tell the concierge a number and it shows here.";
+      const src = b.source === "said" ? `You said up to ${money(b.ceiling)}` : b.source === "open" ? `Left open, so the concierge set a ${money(b.ceiling)} cap` : `Usual ${money(b.normal[0])}–${money(b.normal[1])}, ceiling ${money(b.ceiling)}`;
+      return `${bs.label}. ${src}.`;
+    };
+
+    function draw() {
+      const b = p.frame && p.frame.budget; const bs = BL.budgetStatus(p.total, b);
+      const items = p.items.slice().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+      const days = trip ? BL.planDays(p) : [];
+      const sheet = trip && p.budget;
+      const sub = trip ? `${fdate(p.date, "long")}, ${BL.plural(p.frame.nights || 1, "night")} · ${BL.plural(p.guests, "guest")}` : `${fdate(p.date, "long")} · ${BL.plural(p.guests, "guest")}${p.preference === "walkable" ? " · all within a walk" : p.preference === "taxi" ? " · short taxis between" : ""}`;
+      view.innerHTML = `
+        <h1 class="large-title">${esc(p.title)}<small>${sub}</small></h1>
+        ${p.status === "booked" ? `<a class="row press group mb-6" href="booking.html?id=${p.bookingId}" style="padding:4px 16px">${icon("check-circle", "sm")}<span class="body"><span class="title">Booked</span><span class="sub">Open the booking for codes and vendor status</span></span>${icon("chevron-right", "sm chev")}</a>` : ""}
+        ${p.assumptions ? `<p class="text-sm muted mb-5">${esc(p.assumptions)} Change any of it in the chat.</p>` : ""}
+        ${trip ? days.map((d) => `<section class="section"><div class="section-title"><h2>Day ${d.n + 1}</h2><span class="muted text-sm">${fdate(d.date)}</span></div><div class="timeline stagger">${d.stops.map((x, i) => x.kind ? info(x, i) : stop(x, x.idx)).join("")}</div></section>`).join("")
+          : items.length ? `<div class="timeline stagger mb-2">${items.map((it) => stop(it, p.items.indexOf(it))).join("")}</div>` : `<div class="empty mb-6"><h3>Nothing left in this plan</h3><p>Add a stop or ask the concierge to start again.</p></div>`}
+        ${trip && !items.length ? `<div class="empty mb-6"><h3>Nothing left in this trip</h3><p>Add a stop or ask the concierge to start again.</p></div>` : ""}
+        ${p.status === "draft" ? `<button class="btn btn-secondary btn-block mb-7" id="add">${icon("plus", "sm")}Add a stop</button>` : ""}
+        ${p.status === "draft" && p.upgrade ? `<section class="section"><div class="section-title"><h2>One upgrade fits</h2></div><p class="text-sm mb-3">${esc(p.upgrade.text)}</p><div class="flex gap-2"><button class="btn btn-secondary btn-sm" id="upgrade">Switch</button><button class="btn btn-ghost btn-sm" id="keep">Keep it</button></div></section>` : ""}
+        ${p.status === "draft" && !trip ? `<section class="section"><div class="section-title"><h2>Guests</h2></div><div class="flex items-center justify-between"><div class="stepper" aria-label="Guests"><button id="minus" aria-label="Fewer guests">${icon("minus", "sm")}</button><output>${p.guests}</output><button id="plus" aria-label="More guests">${icon("plus", "sm")}</button></div><p class="text-sm muted">Per-person stops reprice</p></div></section>` : ""}
+        <section class="section">
+          <div class="section-title"><h2>Budget</h2><span class="num">${money(p.total)}</span></div>
+          ${bs.key === "none" ? "" : `<div class="meter mb-2" aria-hidden="true"><span style="width:${Math.min(100, Math.round(bs.pct * 100))}%;background:var(--${bs.tone === "bad" ? "bad" : bs.tone === "wait" ? "wait" : "ok"})"></span></div>`}
+          <p class="text-sm ${bs.tone === "bad" ? "text-[var(--bad)]" : "muted"}">${esc(budgetLine(bs, b))}</p>
+          ${bs.key === "over" ? `<p class="help mt-1">Nothing is booked above the cap without you saying so on the next screen.</p>` : ""}
+          ${sheet ? `<div class="sheet-rows mt-4">${sheet.rows.map((r) => `<div class="r"><span>${esc(r.name)}</span><span class="env num">${money(r.envelope)}</span><span class="num">${money(r.planned)}</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ""}</div>`).join("")}<div class="r"><span class="font-medium">Unspent</span><span class="env num">${money(sheet.envelope)}</span><span class="num">${money(sheet.unspent)}</span></div></div>` : ""}
+        </section>
+        <section class="section">
+          <div class="kv"><dt>Vendors to pay</dt><dd>${[...new Set(items.map((i) => i.vendorId))].length}</dd><dt>Charged as</dt><dd>One payment, split by Blissers</dd><dt>Holds</dt><dd>Each vendor holds while you pay</dd><dt>Cancellation</dt><dd>Full refund up to 24 h before</dd></div>
+        </section>`;
+      cta.hidden = p.status !== "draft" || !items.length;
+      payBtn.querySelector(".label").textContent = `Review and pay · ${money(p.total)}`;
+    }
+    draw();
+
+    BL.on(view, "click", "#minus", () => { BL.setPlanGuests(p.id, Math.max(1, p.guests - 1)); draw(); });
+    BL.on(view, "click", "#plus", () => { BL.setPlanGuests(p.id, Math.min(12, p.guests + 1)); draw(); });
+    BL.on(view, "click", "#upgrade", () => { const r = BL.applyUpgrade(p.id); BL.save(); draw(); if (r) BL.toast(`Switched to ${r.to.title}`); });
+    BL.on(view, "click", "#keep", () => { p.upgrade = null; BL.save(); draw(); BL.toast("Kept as it was"); });
+    BL.on(view, "click", "[data-remove]", async (e, b) => {
+      const i = Number(b.dataset.remove); const o = BL.offer(p.items[i].offerId);
+      if (!(await BL.confirm({ title: `Drop ${o.title}?`, body: "The concierge keeps the other stops and the time between them.", ok: "Drop it", danger: true }))) return;
+      BL.leave(b.closest(".stop"), () => { BL.removePlanItem(p.id, i); draw(); BL.toast("Stop removed"); });
+    });
+    BL.on(view, "click", "[data-swap]", (e, b) => {
+      const i = Number(b.dataset.swap); const it = p.items[i]; const alts = BL.alternativesFor(it, p.guests);
+      const sheet = BL.sheet({ title: "Swap this stop", body: alts.length ? `<p class="muted text-sm mb-3">Same category, same ${trip ? "trip" : "evening"}. Prices are for ${BL.plural(p.guests, "guest")}${it.nights ? ` and ${BL.plural(it.nights, "night")}` : ""}.</p><div class="group">${alts.map((o) => { const v = BL.vendor(o.vendorId); const pr = BL.itemPrice(o, p.guests) * (it.nights || 1); return `<button class="row press" data-alt="${o.id}"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub block truncate">${esc(v.name)} · ${esc(v.area)} · ${BL.vendorRating(v)}</span></span><span class="right num ${pr < it.price ? "text-[var(--ok)]" : ""}">${money(pr)}</span></button>`; }).join("")}</div>` : `<div class="empty"><h3>No alternative</h3><p>This is the only option in its category.</p></div>`, actions: [{ label: "Keep it" }] });
+      sheet.el.addEventListener("click", (e) => { const a = e.target.closest("[data-alt]"); if (!a) return; BL.swapPlanItem(p.id, i, a.dataset.alt); sheet.close(); draw(); BL.toast("Swapped"); });
+    });
+    BL.on(view, "click", "#add", () => {
+      const have = new Set(p.items.map((i) => i.offerId));
+      const byCat = {};
+      state.offers.filter((o) => o.status === "active" && !have.has(o.id) && BL.vendor(o.vendorId).status === "active").forEach((o) => { const c = BL.vendor(o.vendorId).category; (byCat[c] = byCat[c] || []).push(o); });
+      const sheet = BL.sheet({ title: "Add a stop", body: Object.keys(byCat).map((c) => `<p class="group-cap">${esc(c)}</p><div class="group mb-3">${byCat[c].map((o) => { const v = BL.vendor(o.vendorId); return `<button class="row press" data-add="${o.id}"><span class="body"><span class="title block truncate">${esc(o.title)}</span><span class="sub block truncate">${esc(v.name)} · ${esc(v.area)}</span></span><span class="right num">${money(BL.itemPrice(o, p.guests))}</span></button>`; }).join("")}</div>`).join(""), actions: [{ label: "Cancel" }] });
+      sheet.el.addEventListener("click", (e) => { const a = e.target.closest("[data-add]"); if (!a) return; BL.addPlanItem(p.id, a.dataset.add); sheet.close(); draw(); BL.toast("Stop added"); });
+    });
+    payBtn.addEventListener("click", async () => {
+      const bs = BL.budgetStatus(p.total, p.frame && p.frame.budget);
+      if (bs.key === "over" && !(await BL.confirm({ title: "Above the cap", body: `This plan is ${money(p.total)}, over the ${money(bs.ceiling)} cap. Go ahead anyway?`, ok: "Go ahead" }))) return;
+      location.href = `pay.html?plan=${p.id}`;
+    });
+  })();
+</script>
+</body>
+</html>

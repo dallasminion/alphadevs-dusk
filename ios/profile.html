@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" class="ios">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mvp-screen" content="Onboarding & Profile">
+<title>Profile · Blissers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="../assets/tailwind.config.js"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+</head>
+<body class="ios">
+<main class="scroll" id="content">
+  <h1 class="large-title">Profile</h1>
+  <div id="view" class="stagger"></div>
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+  (function () {
+    BL.ios.shell({ title: "Profile", tab: "profile", large: true });
+    const { esc, icon, money, fdate, state } = BL;
+    const view = document.getElementById("view");
+    const PLANS = [["Free", 0, "Concierge with a daily limit"], ["Plus", 49, "Unlimited concierge, priority holds"], ["Premium", 129, "Everything, plus a human planner on call"]];
+    const row = (href, ic, title, sub, right) => `<a class="row press" href="${href}">${icon(ic, "sm")}<span class="body"><span class="title block truncate">${esc(title)}</span>${sub ? `<span class="sub block truncate">${esc(sub)}</span>` : ""}</span><span class="right">${right || ""}</span>${icon("chevron-right", "sm chev")}</a>`;
+    const sw = (key, label, on) => `<label class="row" style="cursor:pointer"><span class="body"><span class="title">${label}</span></span><span class="switch"><input type="checkbox" data-notify="${key}" ${on ? "checked" : ""}><span></span></span></label>`;
+
+    function draw() {
+      const p = state.profile; const s = p.subscription;
+      view.innerHTML = `
+        <div class="flex items-center gap-4 mb-7">
+          <div class="avatar lg" aria-hidden="true">${BL.initials(p.name)}</div>
+          <div class="min-w-0 flex-1"><h2 class="truncate">${esc(p.name)}</h2><p class="muted text-sm truncate">${esc(p.email)}</p></div>
+          <button class="btn btn-secondary btn-sm" id="edit">Edit</button>
+        </div>
+
+        <p class="group-cap">Membership</p>
+        <div class="group mb-6">
+          <button class="row press" id="plan"><span class="tile" style="width:36px;height:36px">${icon("sparkle", "sm")}</span><span class="body"><span class="title">${esc(s.plan)} plan</span><span class="sub">${s.price ? `${money(s.price)} a month · renews ${fdate(s.renews, "num")}` : "No monthly fee"}</span></span>${icon("chevron-right", "sm chev")}</button>
+          <label class="row" style="cursor:pointer"><span class="body"><span class="title">Auto-renew</span></span><span class="switch"><input type="checkbox" id="autoRenew" ${s.autoRenew ? "checked" : ""}><span></span></span></label>
+          ${row("wallet.html", "wallet", "Wallet and points", `${money(p.walletBalance)} · ${p.points.toLocaleString("en-IL")} points`)}
+        </div>
+
+        <p class="group-cap">Preferences</p>
+        <div class="group mb-6">
+          ${row("setup.html?step=2&from=profile", "heart", "Interests", p.interests.join(", "))}
+          ${row("setup.html?step=1&from=profile", "pin", "Location", `${p.area}, ${p.city}`)}
+        </div>
+
+        <p class="group-cap">Remembered by the concierge</p>
+        <div class="group mb-6">
+          ${p.remembered.length ? p.remembered.map((m) => `<div class="row">${icon(m.kind === "budget" ? "sliders" : "sparkle", "sm")}<span class="body"><span class="title block truncate">${esc(m.text)}</span><span class="sub block truncate">Kept ${BL.fstamp(m.at)} · used until you say otherwise</span></span><button class="btn btn-ghost btn-sm press" data-forget="${m.id}" aria-label="Forget ${esc(m.text)}">Forget</button></div>`).join("") : `<a class="row press" href="concierge.html">${icon("chat", "sm")}<span class="body"><span class="title">Nothing kept yet</span><span class="sub block truncate">Say “remember this” in the concierge after it asks</span></span>${icon("chevron-right", "sm chev")}</a>`}
+        </div>
+
+        <p class="group-cap">Notifications</p>
+        <div class="group mb-6">
+          ${sw("push", "Push", p.notifications.push)}${sw("email", "Email", p.notifications.email)}${sw("whatsapp", "WhatsApp", p.notifications.whatsapp)}
+        </div>
+
+        <p class="group-cap">Help</p>
+        <div class="group mb-6">
+          ${row("support.html", "headset", "Support", "Chat with the concierge or a person")}
+          ${row("feedback.html", "star", "Rate a booking", "Earn 50 points per review")}
+        </div>
+
+        <p class="group-cap">Viewing as</p>
+        <div class="seg mb-2" id="role" role="group" aria-label="Switch role">
+          <button class="is-on" data-role="user" aria-pressed="true">Member</button>
+          <button data-role="vendor" aria-pressed="false">Vendor</button>
+          <button data-role="admin" aria-pressed="false">Admin</button>
+        </div>
+        <p class="help mb-6 ml-4">Vendor and Admin open the web app in this browser.</p>
+
+        <p class="group-cap">Language</p>
+        <div class="seg mb-6" id="lang" role="group" aria-label="Switch language">
+          <button class="is-on" data-lang="en" aria-pressed="true" translate="no" lang="en">English</button>
+          <button data-lang="he" aria-pressed="false" translate="no" lang="he">עברית</button>
+        </div>
+
+        <div class="group mb-6">
+          <button class="row press" id="reset">${icon("refresh", "sm")}<span class="body"><span class="title">Reset demo data</span><span class="sub">Back to the seeded state</span></span></button>
+          <a class="row press" href="../index.html">${icon("logout", "sm")}<span class="body"><span class="title">Sign out</span></span></a>
+        </div>
+        <p class="muted text-caption text-center">Phone ${esc(p.phone)} · ${p.verified ? "verified" : "not verified"}</p>`;
+      Array.from(view.children).forEach((c, i) => c.style.setProperty("--i", Math.min(i, 14)));
+    }
+    draw();
+
+    view.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t.id === "autoRenew") { state.profile.subscription.autoRenew = t.checked; BL.save(); BL.toast(t.checked ? "Auto-renew on" : "Auto-renew off"); }
+      if (t.dataset.notify) { state.profile.notifications[t.dataset.notify] = t.checked; BL.save(); }
+    });
+    BL.on(view, "click", "#edit", () => {
+      const p = state.profile;
+      BL.sheet({ title: "Edit profile", body: `
+        <div class="flex flex-col gap-3 mt-2">
+          <div class="field"><label class="label" for="eName">Name</label><input class="input" id="eName" type="text" autocomplete="name" value="${esc(p.name)}"></div>
+          <div class="field"><label class="label" for="eEmail">Email</label><input class="input" id="eEmail" type="email" inputmode="email" autocomplete="email" value="${esc(p.email)}"></div>
+          <div class="field"><label class="label" for="ePhone">Phone</label><input class="input" id="ePhone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(p.phone)}"></div>
+        </div>`, actions: [
+          { label: "Save", kind: "primary", onClick: (close, host) => { BL.saveProfile({ name: host.querySelector("#eName").value.trim() || p.name, email: host.querySelector("#eEmail").value.trim() || p.email, phone: host.querySelector("#ePhone").value.trim() || p.phone }); close(); draw(); BL.toast("Profile saved"); } },
+          { label: "Cancel" },
+        ] });
+    });
+    BL.on(view, "click", "#plan", () => {
+      const cur = state.profile.subscription.plan;
+      BL.sheet({ title: "Choose a plan", body: `<div class="group mt-2" id="plans">${PLANS.map(([n, pr, d]) => `<button class="row press" data-plan="${n}"><span class="body"><span class="title">${n}</span><span class="sub">${d}</span></span><span class="right">${pr ? money(pr) + "/mo" : "Free"}</span>${n === cur ? icon("check", "sm") : ""}</button>`).join("")}</div>`,
+        actions: [{ label: "Keep current plan" }] }).el.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-plan]"); if (!b) return;
+          const [n, pr] = PLANS.find((x) => x[0] === b.dataset.plan);
+          state.profile.subscription.plan = n; state.profile.subscription.price = pr;
+          const u = BL.user(BL.me()); if (u) u.plan = n;
+          BL.save(); e.currentTarget.querySelector(".scrim").click(); draw(); BL.toast(`${n} plan from today`);
+        });
+    });
+    BL.on(view, "click", "[data-role]", (e, b) => {
+      const role = b.dataset.role; if (role === "user") return;
+      state.role = role; BL.save(); location.href = `../web/${BL.web.home[role]}`;
+    });
+    BL.on(view, "click", "[data-forget]", (e, b) => {
+      BL.forgetPreference(b.dataset.forget); draw(); BL.toast("Forgotten. The concierge will ask again");
+    });
+    BL.on(view, "click", "#reset", async () => {
+      if (await BL.confirm({ title: "Reset demo data?", body: "Every booking, ticket and change made in this session goes back to the seeded state.", ok: "Reset", danger: true })) BL.reset();
+    });
+  })();
+</script>
+</body>
+</html>
