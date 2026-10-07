@@ -1,4 +1,4 @@
-Blissers — clickable prototype
+Dusk — clickable prototype
 
 Open index.html in any browser (double-click it). There is nothing to install.
 Keep the folder together, and stay online while you look: the prototype loads

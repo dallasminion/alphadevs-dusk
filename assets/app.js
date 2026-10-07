@@ -1,4 +1,4 @@
-/* Blissers demo state and shared chrome. One store, one key, every screen reads through it.
+/* Dusk demo state and shared chrome. One store, one key, every screen reads through it.
    Classic script (not a module) because module scripts are blocked on file://. */
 (function () {
   "use strict";
@@ -85,7 +85,7 @@
       { id: "u9", name: "Lior Avraham", email: "lior.a@example.com", phone: "+972 52 901 2345", role: "member", plan: "Plus", status: "active", joined: day(-77), city: "Tel Aviv" },
       { id: "u10", name: "Hila Goldberg", email: "hila.g@example.com", phone: "+972 54 012 3456", role: "member", plan: "Free", status: "active", joined: day(-33), city: "Givatayim" },
       { id: "u11", name: "Avi Rosen", email: "avi@claro.example", phone: "+972 3 601 7777", role: "vendor", plan: "—", status: "active", joined: day(-412), city: "Tel Aviv", vendorId: "v1" },
-      { id: "u12", name: "Dana Weiss", email: "dana@blissers.example", phone: "+972 54 999 0001", role: "admin", plan: "—", status: "active", joined: day(-800), city: "Tel Aviv" },
+      { id: "u12", name: "Dana Weiss", email: "dana@dusk.example", phone: "+972 54 999 0001", role: "admin", plan: "—", status: "active", joined: day(-800), city: "Tel Aviv" },
       { id: "u13", name: "Rotem Segal", email: "rotem.s@example.com", phone: "+972 50 111 2222", role: "member", plan: "Free", status: "suspended", joined: day(-260), city: "Tel Aviv", statusReason: "Chargeback on two bookings in August." },
       { id: "u14", name: "Michal Oren", email: "michal@vinovino.example", phone: "+972 54 101 2020", role: "vendor", plan: "—", status: "active", joined: day(-6), city: "Tel Aviv", vendorId: "v13" },
       { id: "u15", name: "Gal Nahum", email: "gal@hamamlevinsky.example", phone: "+972 50 404 9090", role: "vendor", plan: "—", status: "active", joined: day(-2), city: "Tel Aviv", vendorId: "v14" },
@@ -291,6 +291,7 @@
   const ICONS = {
     home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>',
     chat: '<path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"/>',
+    sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
     sparkle: '<path d="M12 3c.6 5 3.9 8.4 9 9-5.1.6-8.4 4-9 9-.6-5-3.9-8.4-9-9 5.1-.6 8.4-4 9-9z"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     ticket: '<path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6z"/><path d="M12 5v14" stroke-dasharray="2 2"/>',
@@ -521,7 +522,7 @@
     const backHtml = o.back ? `<button class="back" data-back="${esc(o.back)}">${icon("chevron-left")}<span>${esc(o.backLabel || "Back")}</span></button>` : "";
     nav.innerHTML = `<div class="left">${backHtml}</div><div class="nav-title">${esc(o.title || "")}</div><div class="rightside">${o.right || ""}</div>`;
     document.body.prepend(nav); document.body.prepend(sb);
-    document.title = `${o.title || "Blissers"} · Blissers`;
+    document.title = `${o.title || "Dusk"} · Dusk`;
     if (!document.querySelector('meta[name="theme-color"]')) { const m = document.createElement("meta"); m.name = "theme-color"; m.content = "#0a0a0a"; document.head.appendChild(m); }
     if (scroll) {
       if (!o.tab) scroll.classList.add("no-tabs");
@@ -555,7 +556,7 @@
     if (state.role !== role) { state.role = role; save(); }
     const whoName = role === "vendor" ? vendor(state.session.vendorId).contact.name : "Dana Weiss";
     const side = document.createElement("aside"); side.className = "sidebar"; side.id = "sidebar"; side.setAttribute("aria-label", "Sidebar");
-    side.innerHTML = `<div class="brand">${icon("sparkle")}<span>Blissers</span><button class="btn btn-ghost btn-icon btn-sm ml-auto lg:hidden" data-close-menu aria-label="Close menu">${icon("x")}</button></div>
+    side.innerHTML = `<div class="brand"><span class="mark">${icon("sparkles", "sm")}</span><span>Dusk</span><button class="btn btn-ghost btn-icon btn-sm ml-auto lg:hidden" data-close-menu aria-label="Close menu">${icon("x")}</button></div>
       <nav aria-label="Primary">${WEB_NAV[role].map(([k, l, h, ic]) => `<a href="${h}" class="${k === o.active ? "is-active" : ""}" ${k === o.active ? 'aria-current="page"' : ""}>${icon(ic)}<span>${l}</span></a>`).join("")}</nav>
       <div class="foot">
         <div class="role"><label class="label" for="roleSwitch">Viewing as</label>
@@ -576,7 +577,7 @@
       <div class="who"><span>${esc(whoName)}</span><div class="avatar sm" aria-hidden="true">${initials(whoName)}</div></div>`;
     main.prepend(top);
     main.classList.add("screen");
-    document.title = `${o.title || "Blissers"} · ${ROLE_LABEL[role]} · Blissers`;
+    document.title = `${o.title || "Dusk"} · ${ROLE_LABEL[role]} · Dusk`;
     if (!document.querySelector('meta[name="theme-color"]')) { const m = document.createElement("meta"); m.name = "theme-color"; m.content = "#0a0a0a"; document.head.appendChild(m); }
     const openMenu = () => { side.classList.add("is-open"); bd.classList.add("is-open"); };
     const closeMenu = () => { side.classList.remove("is-open"); bd.classList.remove("is-open"); };
@@ -1236,7 +1237,7 @@
   }
   function adminEditItem(bookingId, idx, patch) {
     const b = booking(bookingId); const it = b.items[idx]; if (!it) return b;
-    if (patch.remove) { it.status = "declined"; it.declineReason = patch.reason || "Removed by Blissers"; refundItem(b, it, it.declineReason); }
+    if (patch.remove) { it.status = "declined"; it.declineReason = patch.reason || "Removed by Dusk"; refundItem(b, it, it.declineReason); }
     else { if (patch.price != null) it.price = patch.price; if (patch.time) it.time = patch.time; if (patch.date) it.date = patch.date; it.editedBy = "admin"; }
     b.total = b.items.reduce((s, i) => s + i.price, 0);
     const pay = payment(b.paymentId); if (pay && !patch.remove) pay.amount = b.total;
@@ -1311,7 +1312,7 @@
     s.messages.push({ from: s.status === "handed_off" ? "agent" : "concierge", text, at: nowIso() }); s.updatedAt = nowIso(); save(); return s;
   }
   function supportHandoff(threadId) {
-    const s = state.supportThreads.find((x) => x.id === threadId); s.status = "handed_off"; s.messages.push({ from: "agent", text: "Hi, Dana from Blissers. I've read the thread and I'm on it. You'll hear from me here.", at: nowIso() }); s.updatedAt = nowIso(); save(); return s;
+    const s = state.supportThreads.find((x) => x.id === threadId); s.status = "handed_off"; s.messages.push({ from: "agent", text: "Hi, Dana from Dusk. I've read the thread and I'm on it. You'll hear from me here.", at: nowIso() }); s.updatedAt = nowIso(); save(); return s;
   }
   function supportResolve(threadId) { const s = state.supportThreads.find((x) => x.id === threadId); s.status = "resolved"; s.updatedAt = nowIso(); save(); return s; }
 

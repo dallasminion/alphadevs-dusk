@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Home / Explore">
-<title>Place · Blissers</title>
+<title>Place · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
     const v = BL.vendor(BL.qs("id"));
     BL.ios.shell({ title: v ? v.name : "Place", back: "explore.html", backLabel: "Explore", tab: "home" });
     const view = document.getElementById("view");
-    if (!v) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("store")}</span><h3>This place isn’t listed</h3><p>It may have left Blissers or the link is old.</p><a class="btn btn-primary btn-sm" href="explore.html">Back to Explore</a></div>`; return; }
+    if (!v) { view.innerHTML = `<div class="empty mt-10"><span class="tile">${icon("store")}</span><h3>This place isn’t listed</h3><p>It may have left Dusk or the link is old.</p><a class="btn btn-primary btn-sm" href="explore.html">Back to Explore</a></div>`; return; }
     const offers = state.offers.filter((o) => o.vendorId === v.id && o.status === "active");
     const events = state.events.filter((e) => e.vendorId === v.id && e.status !== "past").sort((a, b) => a.date.localeCompare(b.date));
     const reviews = state.feedback.filter((f) => { const b = BL.booking(f.bookingId); return b && b.items.some((i) => i.vendorId === v.id); }).slice(0, 3);

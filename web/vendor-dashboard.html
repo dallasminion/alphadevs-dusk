@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Vendor Portal">
-<title>Dashboard · Blissers</title>
+<title>Dashboard · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -39,7 +39,7 @@
       const hour = new Date().getHours();
       view.innerHTML = `
         <div class="page-head"><div><h1>${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${esc(v.contact.name.split(" ")[0])}</h1><p>${esc(v.name)} · ${fdate(today, "long")}${v.status !== "active" ? ` · ${BL.statusLabel(v.status)}` : ""}</p></div><a class="btn btn-primary" href="vendor-redemption.html">${icon("qr", "sm")}Redeem a code</a></div>
-        ${v.status !== "active" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">${v.status === "pending" ? "Blissers is reviewing your application. Offers go live the moment it is approved." : `This listing is suspended. ${esc(v.statusReason || "")}`}</p></div>` : ""}
+        ${v.status !== "active" ? `<div class="panel p-4 mb-6 flex gap-3 items-start">${icon("info", "sm")}<p class="text-sm">${v.status === "pending" ? "Dusk is reviewing your application. Offers go live the moment it is approved." : `This listing is suspended. ${esc(v.statusReason || "")}`}</p></div>` : ""}
         <div class="grid-stats mb-8">
           <a class="stat panel p-4 pressable" href="vendor-bookings.html?tab=pending"><span class="value">${pending.length}</span><span class="label muted">Awaiting your answer</span></a>
           <a class="stat panel p-4 pressable" href="vendor-bookings.html"><span class="value">${todays.reduce((s, x) => s + x.it.guests, 0)}</span><span class="label muted">Guests today</span></a>
@@ -61,7 +61,7 @@
           <div>
             <section class="section"><div class="section-title"><h2>Your events</h2><a href="checkin.html">Door check-in</a></div>
               ${events.length ? `<div class="panel px-4">${events.map((e) => `<a class="row press" href="checkin.html?event=${e.id}"><span class="tile">${icon("ticket", "sm")}</span><span class="body"><span class="title block truncate">${esc(e.title)}</span><span class="sub block truncate">${fdate(e.date)} · ${e.time} · ${e.sold} of ${e.capacity} sold</span></span>${icon("chevron-right", "sm chev")}</a>`).join("")}</div>`
-              : `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No events scheduled</h3><p>Blissers adds events with you from the back office.</p></div>`}
+              : `<div class="empty panel"><span class="tile">${icon("ticket")}</span><h3>No events scheduled</h3><p>Dusk adds events with you from the back office.</p></div>`}
             </section>
             <section class="section"><div class="section-title"><h2>Shortcuts</h2></div>
               <div class="card flex flex-col gap-2">

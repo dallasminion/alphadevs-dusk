@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Back Office">
-<title>Vendor · Blissers</title>
+<title>Vendor · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -43,7 +43,7 @@
             <section class="section"><div class="section-title"><h2>Offers</h2><a href="admin-offer.html?new=1&vendor=${v.id}">New offer</a></div><div id="offers"></div></section>
             <section class="section"><div class="section-title"><h2>Events</h2><a href="admin-event.html?new=1&vendor=${v.id}">New event</a></div><div id="events"></div></section>
             <section class="section"><div class="section-title"><h2>Recent bookings</h2><a href="admin-bookings.html?q=${encodeURIComponent(v.name)}">All</a></div>
-              ${all.length ? `<div class="panel px-4">${all.slice(0, 6).map(({ booking, items }) => `<a class="row press" href="admin-booking.html?id=${booking.id}"><span class="tile num text-sm">${items[0].time}</span><span class="body"><span class="title block truncate">${esc(BL.user(booking.userId).name)} · ${booking.code}</span><span class="sub block truncate">${items.map((i) => esc(BL.offer(i.offerId).title)).join(", ")} · ${fdate(items[0].date)}</span></span><span class="right">${BL.badge(items.length === 1 ? items[0].status : booking.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>No bookings yet</h3><p>Nothing has been booked here through Blissers.</p></div>`}
+              ${all.length ? `<div class="panel px-4">${all.slice(0, 6).map(({ booking, items }) => `<a class="row press" href="admin-booking.html?id=${booking.id}"><span class="tile num text-sm">${items[0].time}</span><span class="body"><span class="title block truncate">${esc(BL.user(booking.userId).name)} · ${booking.code}</span><span class="sub block truncate">${items.map((i) => esc(BL.offer(i.offerId).title)).join(", ")} · ${fdate(items[0].date)}</span></span><span class="right">${BL.badge(items.length === 1 ? items[0].status : booking.status)}</span></a>`).join("")}</div>` : `<div class="empty panel"><span class="tile">${icon("calendar")}</span><h3>No bookings yet</h3><p>Nothing has been booked here through Dusk.</p></div>`}
             </section>
           </div>
           <div>

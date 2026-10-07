@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Back Office">
-<title>Reports · Blissers</title>
+<title>Reports · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
     const members = state.users.filter((u) => u.role === "member" && u.status === "active").length;
     const bars = (items, max, label, val) => `<div class="bar-chart">${items.map((x, i) => `<div class="bar" style="--i:${i}" title="${esc(label(x))} · ${money(val(x))}"><i style="height:${Math.max(4, Math.round((val(x) / max) * 100))}%"></i><b>${esc(label(x))}</b></div>`).join("")}</div>`;
     view.innerHTML = `
-      <div class="page-head"><div><h1>Reports</h1><p>Everything booked through Blissers to ${fdate(BL.day(0), "long")}</p></div><button class="btn btn-secondary" id="dl">${icon("download", "sm")}Download CSV</button></div>
+      <div class="page-head"><div><h1>Reports</h1><p>Everything booked through Dusk to ${fdate(BL.day(0), "long")}</p></div><button class="btn btn-secondary" id="dl">${icon("download", "sm")}Download CSV</button></div>
       <div class="grid-stats mb-8">
         <div class="stat panel p-4"><span class="value" id="gmv">${money(0)}</span><span class="label muted">Booked value</span></div>
         <div class="stat panel p-4"><span class="value" id="com">${money(0)}</span><span class="label muted">Commission earned</span></div>
@@ -62,7 +62,7 @@
     document.getElementById("dl").addEventListener("click", () => {
       const lines = [["Vendor", "Booked", "Commission %", "Commission", "Owed"], ...vendors.map((x) => [x.v.name, x.amt, x.v.commission, Math.round(x.amt * x.v.commission / 100), Math.round(x.amt * (100 - x.v.commission) / 100)])];
       const blob = new Blob([lines.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `blissers-payouts-${BL.day(0)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); BL.toast("CSV downloaded");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `dusk-payouts-${BL.day(0)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); BL.toast("CSV downloaded");
     });
   })();
 </script>
