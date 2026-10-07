@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Support & Feedback">
-<title>Support chat · Blissers</title>
+<title>Support chat · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -37,9 +37,9 @@
       const b = thread ? BL.booking(thread.bookingId) : booking;
       top.innerHTML = `${isNew && !thread ? `<div class="field mb-4"><label class="label" for="subject">What is it about?</label><input class="input" id="subject" value="${esc(subject)}" placeholder="A booking, a refund, anything" autocomplete="off"></div>` : ""}
         ${b ? `<a class="row press group mb-4" href="booking.html?id=${b.id}" style="padding:4px 16px">${icon("calendar", "sm")}<span class="body"><span class="title block truncate">${esc(b.title)}</span><span class="sub">${b.code} · ${BL.bookingWhen(b)}</span></span>${icon("chevron-right", "sm chev")}</a>` : ""}
-        ${thread ? `<div class="flex items-center justify-between mb-3"><span class="muted text-sm">${thread.status === "handed_off" ? "Dana from Blissers is on this" : thread.status === "resolved" ? "Resolved. Write again to reopen." : "The concierge answers in seconds"}</span>${BL.badge(thread.status)}</div>` : `<p class="muted text-sm mb-3">Tell us what happened. A person can step in at any point.</p>`}`;
+        ${thread ? `<div class="flex items-center justify-between mb-3"><span class="muted text-sm">${thread.status === "handed_off" ? "Dana from Dusk is on this" : thread.status === "resolved" ? "Resolved. Write again to reopen." : "The concierge answers in seconds"}</span>${BL.badge(thread.status)}</div>` : `<p class="muted text-sm mb-3">Tell us what happened. A person can step in at any point.</p>`}`;
     }
-    const bubble = (m) => `<div class="bubble ${m.from === "user" ? "me" : "ai"}">${m.from === "agent" ? `<span class="text-caption muted block mb-1">Dana · Blissers</span>` : ""}<span>${esc(m.text)}</span><span class="time">${BL.ftime(m.at)}</span></div>`;
+    const bubble = (m) => `<div class="bubble ${m.from === "user" ? "me" : "ai"}">${m.from === "agent" ? `<span class="text-caption muted block mb-1">Dana · Dusk</span>` : ""}<span>${esc(m.text)}</span><span class="time">${BL.ftime(m.at)}</span></div>`;
     function drawChat() { chat.innerHTML = thread ? thread.messages.map(bubble).join("") : ""; scroll.scrollTop = scroll.scrollHeight; }
     const typing = () => { const t = document.createElement("div"); t.className = "bubble ai typing"; t.innerHTML = "<i></i><i></i><i></i>"; chat.appendChild(t); scroll.scrollTop = scroll.scrollHeight; return t; };
     drawTop(); drawChat();
@@ -50,7 +50,7 @@
       if (!thread) {
         const subj = (document.getElementById("subject").value.trim() || t.slice(0, 40));
         thread = BL.supportNew(subj, t, bookingId); history.replaceState(null, "", `support-chat.html?id=${thread.id}`);
-        document.querySelector(".nav-title").textContent = subj; document.title = `${subj} · Blissers`;
+        document.querySelector(".nav-title").textContent = subj; document.title = `${subj} · Dusk`;
       } else BL.supportReply(thread.id, t);
       busy = true; text.value = ""; text.style.height = ""; drawTop(); drawChat();
       const tp = typing();

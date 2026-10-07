@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Vendor Portal">
-<title>Offers · Blissers</title>
+<title>Offers · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
     document.getElementById("qwrap").innerHTML = `${icon("search", "sm")}<input class="input" type="search" id="q" placeholder="Filter offers" aria-label="Filter offers" autocomplete="off">`;
     const mine = () => state.offers.filter((o) => o.vendorId === vid);
     const bookingsOf = (o) => state.bookings.reduce((n, b) => n + b.items.filter((i) => i.offerId === o.id && i.status !== "declined" && i.status !== "cancelled").length, 0);
-    const sub = () => { document.getElementById("sub").textContent = `${BL.plural(mine().filter((o) => o.status === "active").length, "live offer")}${v.status === "pending" ? " · drafts go live once Blissers approves you" : ""}`; };
+    const sub = () => { document.getElementById("sub").textContent = `${BL.plural(mine().filter((o) => o.status === "active").length, "live offer")}${v.status === "pending" ? " · drafts go live once Dusk approves you" : ""}`; };
     const rows = () => { const q = document.getElementById("q").value.trim().toLowerCase(); const s = document.getElementById("status").value; return mine().filter((o) => (!s || o.status === s) && (!q || `${o.title} ${o.tags.join(" ")}`.toLowerCase().includes(q))); };
     const t = BL.webTable(document.getElementById("table"), { rows, sort: "title", href: (o) => `vendor-offers.html?edit=${o.id}`, pageSize: 10,
       cols: [{ key: "title", label: "Offer", render: (o) => `<span class="truncate">${esc(o.title)}</span>` }, { key: "price", label: "Price", num: true, render: (o) => `${money(o.price)} <span class="muted">${esc(o.unit)}</span>` }, { key: "duration", label: "Length", num: true, render: (o) => o.duration ? `${o.duration} min` : "—" }, { key: "tags", label: "Tags", sort: (o) => o.tags.join(","), render: (o) => o.tags.map((x) => `<span class="tag">${esc(x)}</span>`).join(" ") }, { key: "bookings", label: "Bookings", num: true, sort: bookingsOf, render: (o) => bookingsOf(o) }, { key: "status", label: "Status", render: (o) => BL.badge(o.status) }],
@@ -53,7 +53,7 @@
           <div class="field"><label class="label" for="price">Price</label><input class="input num" id="price" name="price" type="number" inputmode="numeric" min="0" step="10" value="${o.price}"><p class="error">A price of ₪0 or more.</p></div>
           <div class="field"><label class="label" for="unit">Priced</label><select class="select" id="unit" name="unit">${units.map((u) => `<option ${u === o.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
           <div class="field"><label class="label" for="dur">Length, minutes</label><input class="input num" id="dur" name="duration" type="number" inputmode="numeric" min="0" step="15" value="${o.duration}"><p class="help">0 for an add-on with no set length.</p></div>
-          <div class="field"><label class="label" for="st">Status</label><select class="select" id="st" name="status"><option value="active" ${o.status === "active" ? "selected" : ""} ${v.status !== "active" ? "disabled" : ""}>Active</option><option value="paused" ${o.status === "paused" ? "selected" : ""}>Paused</option><option value="draft" ${o.status === "draft" ? "selected" : ""}>Draft</option></select>${v.status !== "active" ? `<p class="help">Offers go live once Blissers approves your listing.</p>` : ""}</div>
+          <div class="field"><label class="label" for="st">Status</label><select class="select" id="st" name="status"><option value="active" ${o.status === "active" ? "selected" : ""} ${v.status !== "active" ? "disabled" : ""}>Active</option><option value="paused" ${o.status === "paused" ? "selected" : ""}>Paused</option><option value="draft" ${o.status === "draft" ? "selected" : ""}>Draft</option></select>${v.status !== "active" ? `<p class="help">Offers go live once Dusk approves your listing.</p>` : ""}</div>
           <div class="field md:col-span-2"><label class="label" for="tags">Tags</label><input class="input" id="tags" name="tags" value="${esc(o.tags.join(", "))}" placeholder="Evening, Date night" autocomplete="off"><p class="help">Comma-separated. Members see them on the card.</p></div>
           <div class="field md:col-span-2"><label class="label" for="desc">Description</label><textarea class="textarea" id="desc" name="description" rows="3">${esc(o.description)}</textarea></div>
         </form>`,

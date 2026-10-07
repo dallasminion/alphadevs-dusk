@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="mvp-screen" content="Plan & Booking Review">
-<title>Plan · Blissers</title>
+<title>Plan · Dusk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Hebrew:wght@400;500;600&display=swap" rel="stylesheet">
@@ -79,7 +79,7 @@
           ${sheet ? `<div class="sheet-rows mt-4">${sheet.rows.map((r) => `<div class="r"><span>${esc(r.name)}</span><span class="env num">${money(r.envelope)}</span><span class="num">${money(r.planned)}</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ""}</div>`).join("")}<div class="r"><span class="font-medium">Unspent</span><span class="env num">${money(sheet.envelope)}</span><span class="num">${money(sheet.unspent)}</span></div></div>` : ""}
         </section>
         <section class="section">
-          <div class="kv"><dt>Vendors to pay</dt><dd>${[...new Set(items.map((i) => i.vendorId))].length}</dd><dt>Charged as</dt><dd>One payment, split by Blissers</dd><dt>Holds</dt><dd>Each vendor holds while you pay</dd><dt>Cancellation</dt><dd>Full refund up to 24 h before</dd></div>
+          <div class="kv"><dt>Vendors to pay</dt><dd>${[...new Set(items.map((i) => i.vendorId))].length}</dd><dt>Charged as</dt><dd>One payment, split by Dusk</dd><dt>Holds</dt><dd>Each vendor holds while you pay</dd><dt>Cancellation</dt><dd>Full refund up to 24 h before</dd></div>
         </section>`;
       cta.hidden = p.status !== "draft" || !items.length;
       payBtn.querySelector(".label").textContent = `Review and pay · ${money(p.total)}`;
