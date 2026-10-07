@@ -1,0 +1,50 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull latest on server
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://alphadevs-dusk.blisslerstechnolabs.com
+
+    steps:
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pinned server host key (output of: ssh-keyscan -t ed25519 <server>)
+          echo "147.79.70.111 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICr2tus1cyIw7W/kZaB4+bIZd95N9+8Vl0FNfJnZoI54" >> ~/.ssh/known_hosts
+
+      - name: Pull and reset on server
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" bash -s <<'EOF'
+            set -euo pipefail
+            cd /var/www/alphadevs-dusk.blisslerstechnolabs.com
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+            git clean -fd
+            echo "Deployed $(git rev-parse --short HEAD): $(git log -1 --pretty=%s)"
+          EOF
+
+      - name: Smoke test
+        run: |
+          sleep 2
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://alphadevs-dusk.blisslerstechnolabs.com/)
+          echo "HTTP $code"
+          test "$code" = "200"
