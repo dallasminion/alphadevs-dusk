@@ -1,6 +1,8 @@
 /* Hebrew for every screen. The pages are written in English; this layer swaps what the member,
    vendor or admin reads for Hebrew and flips the layout to right-to-left.
 
+   Hebrew is the default; English is opt-in via the language control or ?lang=en.
+
    How it works: the language lives under its own localStorage key, so a demo reset never changes
    it. When Hebrew is on, the document gets dir="rtl" and lang="he" before anything paints, and a
    MutationObserver translates every text node and label-bearing attribute as the screens render
@@ -11,15 +13,15 @@
 (function () {
   "use strict";
   const LANG_KEY = "blissers.lang";
-  let lang = "en";
+  let lang = "he";
   /* ?lang=he or ?lang=en on any URL picks the language and keeps it, so a link into the demo
      can open it in Hebrew without a tap. The two-option control on the sign-in screens is the
      normal way in; this is for links and for the portal's preview. */
   try {
     const asked = new URLSearchParams(location.search).get("lang");
     if (asked === "he" || asked === "en") localStorage.setItem(LANG_KEY, asked);
-    lang = localStorage.getItem(LANG_KEY) === "he" ? "he" : "en";
-  } catch (e) { /* storage blocked: stay English */ }
+    lang = localStorage.getItem(LANG_KEY) === "en" ? "en" : "he";
+  } catch (e) { /* storage blocked: stay Hebrew */ }
   const root = document.documentElement;
   root.lang = lang;
   root.dir = lang === "he" ? "rtl" : "ltr";
